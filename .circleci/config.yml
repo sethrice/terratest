@@ -363,6 +363,7 @@ workflows:
       - test:
           context:
             - Gruntwork Admin
+            - Slack Token For Test
           requires:
             - setup
           filters:
