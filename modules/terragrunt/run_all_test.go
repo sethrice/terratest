@@ -19,7 +19,7 @@ func TestRunAll(t *testing.T) {
 	}
 
 	// Test with validate command
-	out := RunAll(t, options, "validate", []string{}, []string{})
+	out := RunAll(t, options, "validate")
 	require.NotEmpty(t, out)
 }
 
@@ -35,7 +35,7 @@ func TestRunAllE(t *testing.T) {
 	}
 
 	// Test with validate command
-	out, err := RunAllE(t, options, "validate", []string{}, []string{})
+	out, err := RunAllE(t, options, "validate")
 	require.NoError(t, err)
 	require.NotEmpty(t, out)
 }
@@ -52,7 +52,7 @@ func TestRunAllWithPlan(t *testing.T) {
 	}
 
 	// Test with plan command - verify output contains expected terraform plan text
-	out, err := RunAllE(t, options, "plan", []string{}, []string{})
+	out, err := RunAllE(t, options, "plan")
 	require.NoError(t, err)
 	require.Contains(t, out, "Changes to Outputs")
 }

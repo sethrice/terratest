@@ -15,7 +15,7 @@ func PlanAllExitCode(t testing.TestingT, options *Options) int {
 
 // PlanAllExitCodeE runs terragrunt run --all -- plan with the given options and returns the detailed exit code.
 func PlanAllExitCodeE(t testing.TestingT, options *Options) (int, error) {
-	args := buildRunArgs([]string{"--all"}, "plan", []string{"-input=false", "-lock=true", "-detailed-exitcode"})
+	args := buildRunArgs([]string{"--all"}, []string{"plan", "-input=false", "-lock=true", "-detailed-exitcode"})
 	return getExitCodeForTerragruntCommandE(t, options, append([]string{"run"}, args...)...)
 }
 
@@ -29,7 +29,7 @@ func Plan(t testing.TestingT, options *Options) string {
 // PlanE runs terragrunt run -- plan for a single unit and returns stdout/stderr.
 // Uses -lock=false since plan is a read-only operation that does not need state locking.
 func PlanE(t testing.TestingT, options *Options) (string, error) {
-	args := buildRunArgs([]string{}, "plan", []string{"-input=false", "-lock=false"})
+	args := buildRunArgs([]string{}, []string{"plan", "-input=false", "-lock=false"})
 	return runTerragruntCommandE(t, options, "run", args...)
 }
 
@@ -43,7 +43,7 @@ func PlanExitCode(t testing.TestingT, options *Options) int {
 
 // PlanExitCodeE runs terragrunt run -- plan for a single unit and returns the detailed exit code.
 func PlanExitCodeE(t testing.TestingT, options *Options) (int, error) {
-	args := buildRunArgs([]string{}, "plan", []string{"-input=false", "-lock=true", "-detailed-exitcode"})
+	args := buildRunArgs([]string{}, []string{"plan", "-input=false", "-lock=true", "-detailed-exitcode"})
 	return getExitCodeForTerragruntCommandE(t, options, append([]string{"run"}, args...)...)
 }
 

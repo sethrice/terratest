@@ -170,11 +170,11 @@ func getExitCodeForTerragruntCommandE(t testing.TestingT, additionalOptions *Opt
 // buildRunArgs constructs the argument list for a terragrunt run command.
 // The -- separator disambiguates Terragrunt flags from OpenTofu/Terraform flags:
 //
-//	run [tgArgs...] -- <command> [tfArgs...]
-func buildRunArgs(tgArgs []string, command string, tfArgs []string) []string {
+//	run [tgArgs...] -- [tfArgs...]
+func buildRunArgs(tgArgs []string, tfArgs []string) []string {
 	var args []string
 	args = append(args, tgArgs...)
-	args = append(args, "--", command)
+	args = append(args, "--")
 	args = append(args, tfArgs...)
 	return args
 }

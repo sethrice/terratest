@@ -23,7 +23,7 @@ func OutputAllJsonE(t testing.TestingT, options *Options) (string, error) {
 	optsCopy := *options
 	optsCopy.TerragruntArgs = append([]string{"--no-color"}, options.TerragruntArgs...)
 
-	args := buildRunArgs([]string{"--all"}, "output", []string{"-json"})
+	args := buildRunArgs([]string{"--all"}, []string{"output", "-json"})
 	rawOutput, err := runTerragruntCommandE(t, &optsCopy, "run", args...)
 	if err != nil {
 		return "", err
@@ -54,7 +54,7 @@ func OutputJsonE(t testing.TestingT, options *Options, key string) (string, erro
 		tfArgs = append(tfArgs, key)
 	}
 
-	args := buildRunArgs([]string{}, "output", tfArgs)
+	args := buildRunArgs([]string{}, append([]string{"output"}, tfArgs...))
 	rawOutput, err := runTerragruntCommandE(t, &optsCopy, "run", args...)
 	if err != nil {
 		return "", err

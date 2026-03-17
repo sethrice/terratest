@@ -15,7 +15,7 @@ func Init(t testing.TestingT, options *Options) string {
 
 // InitE calls terragrunt run -- init and return stdout/stderr
 func InitE(t testing.TestingT, options *Options) (string, error) {
-	args := buildRunArgs([]string{}, "init", initArgs(options))
+	args := buildRunArgs([]string{}, append([]string{"init"}, initArgs(options)...))
 	return runTerragruntCommandE(t, options, "run", args...)
 }
 
