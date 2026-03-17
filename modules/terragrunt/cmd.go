@@ -13,7 +13,11 @@ import (
 // runTerragruntStackCommandE executes terragrunt stack commands
 // It handles argument construction, retry logic, and error handling for all stack commands
 func runTerragruntStackCommandE(
-	t testing.TestingT, opts *Options, subCommand string, additionalArgs ...string) (string, error) {
+	t testing.TestingT,
+	opts *Options,
+	subCommand string,
+	additionalArgs ...string,
+) (string, error) {
 	// Build the base command arguments starting with "stack"
 	commandArgs := []string{"stack"}
 	if subCommand != "" {
@@ -25,8 +29,12 @@ func runTerragruntStackCommandE(
 
 // runTerragruntCommandE is the core function that executes regular tg commands
 // It handles argument construction, retry logic, and error handling for non-stack commands
-func runTerragruntCommandE(t testing.TestingT, opts *Options, command string,
-	additionalArgs ...string) (string, error) {
+func runTerragruntCommandE(
+	t testing.TestingT,
+	opts *Options,
+	command string,
+	additionalArgs ...string,
+) (string, error) {
 	// Build the base command arguments starting with the command
 	commandArgs := []string{command}
 

@@ -6,17 +6,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Init calls terragrunt init and return stdout/stderr
+// Init calls terragrunt run init and return stdout/stderr
 func Init(t testing.TestingT, options *Options) string {
 	out, err := InitE(t, options)
 	require.NoError(t, err)
 	return out
 }
 
-// InitE calls terragrunt init and return stdout/stderr
+// InitE calls terragrunt run init and return stdout/stderr
 func InitE(t testing.TestingT, options *Options) (string, error) {
-	// Use regular terragrunt init command (not terragrunt stack init)
-	return runTerragruntCommandE(t, options, "init", initArgs(options)...)
+	args := append([]string{"init"}, initArgs(options)...)
+	return runTerragruntCommandE(t, options, "run", args...)
 }
 
 // initArgs builds the argument list for terragrunt init command.
