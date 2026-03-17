@@ -1,9 +1,10 @@
-package random
+package random_test
 
 import (
 	"strconv"
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,7 +15,7 @@ func TestRandom(t *testing.T) {
 	max := 100
 
 	for i := 0; i < 100000; i++ {
-		value := Random(min, max)
+		value := random.Random(min, max)
 		assert.True(t, value >= min && value <= max)
 	}
 }
@@ -31,7 +32,7 @@ func TestRandomInt(t *testing.T) {
 	}
 
 	for i := 0; i < 100000; i++ {
-		value := RandomInt(list)
+		value := random.RandomInt(list)
 		assert.Contains(t, list, value)
 	}
 }
@@ -48,18 +49,18 @@ func TestRandomString(t *testing.T) {
 	}
 
 	for i := 0; i < 100000; i++ {
-		value := RandomString(list)
+		value := random.RandomString(list)
 		assert.Contains(t, list, value)
 	}
 }
 
-func TestUniqueId(t *testing.T) {
+func TestUniqueID(t *testing.T) {
 	t.Parallel()
 
 	previouslySeen := map[string]bool{}
 
 	for i := 0; i < 100; i++ {
-		uniqueID := UniqueId()
+		uniqueID := random.UniqueID()
 		assert.Len(t, uniqueID, 6)
 		assert.NotContains(t, previouslySeen, uniqueID)
 
