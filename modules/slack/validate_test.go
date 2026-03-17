@@ -1,7 +1,6 @@
-package slack
+package slack_test
 
 import (
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/gruntwork-io/terratest/modules/environment"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/gruntwork-io/terratest/modules/retry"
+	terratestslack "github.com/gruntwork-io/terratest/modules/slack"
 )
 
 const (
@@ -28,8 +28,8 @@ func TestValidateSlackMessage(t *testing.T) {
 	token := os.Getenv(slackTokenEnv)
 	channelID := os.Getenv(slackChannelIDEnv)
 
-	uniqueID := random.UniqueId()
-	msgTxt := fmt.Sprintf("Test message from terratest: %s", uniqueID)
+	uniqueID := random.UniqueID()
+	msgTxt := "Test message from terratest: " + uniqueID
 
 	slackClt := slack.New(token)
 
@@ -44,7 +44,7 @@ func TestValidateSlackMessage(t *testing.T) {
 		"wait for slack message",
 		10, 10*time.Second,
 		func() (string, error) {
-			err := ValidateExpectedSlackMessageE(t, token, channelID, msgTxt, 10, 5*time.Minute)
+			err := terratestslack.ValidateExpectedSlackMessageE(t, token, channelID, msgTxt, 10, 5*time.Minute)
 			return "", err
 		},
 	)

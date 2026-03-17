@@ -9,7 +9,7 @@ import (
 	"github.com/slack-go/slack"
 )
 
-// ValidateExpectedSlackMessage validates whether a message containing the expected text was posted in the given channel
+// ValidateExpectedSlackMessageE validates whether a message containing the expected text was posted in the given channel
 // ID, looking back historyLimit messages up to the given duration. For example, if you set (15*time.Minute) as the
 // lookBack parameter with historyLimit set to 50, then this will look back the last 50 messages, up to 15 minutes ago.
 // This expects a slack token to be provided. This returns MessageNotFoundErr when there is no match.
@@ -39,21 +39,22 @@ func ValidateExpectedSlackMessageE(
 		return err
 	}
 
-	for _, msg := range resp.Messages {
-		if checkMessageContainsText(msg.Msg, expectedText) {
+	for i := range resp.Messages {
+		if checkMessageContainsText(&resp.Messages[i].Msg, expectedText) {
 			return nil
 		}
 
-		if msg.SubMessage != nil {
-			if checkMessageContainsText(*msg.SubMessage, expectedText) {
+		if resp.Messages[i].SubMessage != nil {
+			if checkMessageContainsText(resp.Messages[i].SubMessage, expectedText) {
 				return nil
 			}
 		}
 	}
+
 	return MessageNotFoundErr{}
 }
 
-func checkMessageContainsText(msg slack.Msg, expectedText string) bool {
+func checkMessageContainsText(msg *slack.Msg, expectedText string) bool {
 	// If this message is not a bot message, ignore.
 	if msg.Type != slack.MsgSubTypeBotMessage && msg.BotID == "" {
 		return false
@@ -65,8 +66,8 @@ func checkMessageContainsText(msg slack.Msg, expectedText string) bool {
 	}
 
 	// Check attachments
-	for _, attachment := range msg.Attachments {
-		if strings.Contains(attachment.Text, expectedText) {
+	for i := range msg.Attachments {
+		if strings.Contains(msg.Attachments[i].Text, expectedText) {
 			return true
 		}
 	}
@@ -84,6 +85,8 @@ func checkMessageContainsText(msg slack.Msg, expectedText string) bool {
 			if headerBlk.Text != nil && strings.Contains(headerBlk.Text.Text, expectedText) {
 				return true
 			}
+		case slack.MBTDivider, slack.MBTImage, slack.MBTAction, slack.MBTContext,
+			slack.MBTFile, slack.MBTInput, slack.MBTRichText, slack.MBTCall, slack.MBTVideo:
 		}
 	}
 
