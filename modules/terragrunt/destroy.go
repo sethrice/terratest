@@ -27,6 +27,6 @@ func Destroy(t testing.TestingT, options *Options) string {
 
 // DestroyE runs terragrunt run -- destroy for a single unit and returns stdout/stderr.
 func DestroyE(t testing.TestingT, options *Options) (string, error) {
-	args := buildRunArgs(nil, "destroy", []string{"-auto-approve", "-input=false"})
+	args := buildRunArgs([]string{}, "destroy", []string{"-auto-approve", "-input=false"})
 	return runTerragruntCommandE(t, options, "run", args...)
 }

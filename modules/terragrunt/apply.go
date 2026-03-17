@@ -29,7 +29,7 @@ func Apply(t testing.TestingT, options *Options) string {
 
 // ApplyE runs terragrunt run -- apply for a single unit and returns stdout/stderr.
 func ApplyE(t testing.TestingT, options *Options) (string, error) {
-	args := buildRunArgs(nil, "apply", []string{"-input=false", "-auto-approve"})
+	args := buildRunArgs([]string{}, "apply", []string{"-input=false", "-auto-approve"})
 	return runTerragruntCommandE(t, options, "run", args...)
 }
 

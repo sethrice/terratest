@@ -14,7 +14,7 @@ func ValidateAll(t testing.TestingT, options *Options) string {
 
 // ValidateAllE runs terragrunt run --all -- validate with the given options and returns stdout/stderr
 func ValidateAllE(t testing.TestingT, options *Options) (string, error) {
-	args := buildRunArgs([]string{"--all"}, "validate", nil)
+	args := buildRunArgs([]string{"--all"}, "validate", []string{})
 	return runTerragruntCommandE(t, options, "run", args...)
 }
 
@@ -27,7 +27,7 @@ func Validate(t testing.TestingT, options *Options) string {
 
 // ValidateE runs terragrunt run -- validate for a single unit and returns stdout/stderr.
 func ValidateE(t testing.TestingT, options *Options) (string, error) {
-	args := buildRunArgs(nil, "validate", nil)
+	args := buildRunArgs([]string{}, "validate", []string{})
 	return runTerragruntCommandE(t, options, "run", args...)
 }
 

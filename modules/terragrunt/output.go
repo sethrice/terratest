@@ -54,7 +54,7 @@ func OutputJsonE(t testing.TestingT, options *Options, key string) (string, erro
 		tfArgs = append(tfArgs, key)
 	}
 
-	args := buildRunArgs(nil, "output", tfArgs)
+	args := buildRunArgs([]string{}, "output", tfArgs)
 	rawOutput, err := runTerragruntCommandE(t, &optsCopy, "run", args...)
 	if err != nil {
 		return "", err
