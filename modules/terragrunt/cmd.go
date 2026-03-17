@@ -139,10 +139,10 @@ func validateOptions(opts *Options) error {
 	return nil
 }
 
-// defaultSuccessExitCode is the exit code returned when terraform command succeeds
+// defaultSuccessExitCode is the exit code returned when the OpenTofu/Terraform command succeeds
 const defaultSuccessExitCode = 0
 
-// defaultErrorExitCode is the exit code returned when terraform command fails
+// defaultErrorExitCode is the exit code returned when the OpenTofu/Terraform command fails
 const defaultErrorExitCode = 1
 
 // getExitCodeForTerragruntCommandE runs terragrunt with the given arguments and options and returns exit code
@@ -165,6 +165,18 @@ func getExitCodeForTerragruntCommandE(t testing.TestingT, additionalOptions *Opt
 		return exitCode, nil
 	}
 	return defaultErrorExitCode, getExitCodeErr
+}
+
+// buildRunArgs constructs the argument list for a terragrunt run command.
+// The -- separator disambiguates Terragrunt flags from OpenTofu/Terraform flags:
+//
+//	run [tgArgs...] -- <command> [tfArgs...]
+func buildRunArgs(tgArgs []string, command string, tfArgs []string) []string {
+	var args []string
+	args = append(args, tgArgs...)
+	args = append(args, "--", command)
+	args = append(args, tfArgs...)
+	return args
 }
 
 // generateCommand creates a shell.Command with the specified tg options and arguments

@@ -60,7 +60,7 @@ func StackOutputJsonE(t testing.TestingT, options *Options, key string) (string,
 	optsCopy := *options
 	optsCopy.TerragruntArgs = append([]string{"--no-color"}, options.TerragruntArgs...)
 
-	// -json is a terraform flag that should go after the output command
+	// -json is an OpenTofu/Terraform flag that should go after the output command
 	args := []string{"-json"}
 	if key != "" {
 		args = append(args, key)

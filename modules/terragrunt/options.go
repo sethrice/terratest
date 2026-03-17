@@ -11,12 +11,12 @@ import (
 // Key concepts:
 // - Options: Configure HOW the test framework executes tg (directories, retry logic, logging)
 // - TerragruntArgs: Global terragrunt flags (e.g., --log-level, --no-color)
-// - TerraformArgs: Command-specific terraform args (e.g., -upgrade for init, or the command itself for stack run)
+// - TerraformArgs: Command-specific OpenTofu/Terraform args (e.g., -upgrade for init, or the command itself for stack run)
 // - Use Options.TerragruntDir to specify WHERE to run tg
 //
 // Example:
 //
-//	// For init with terraform flags
+//	// For init with OpenTofu/Terraform flags
 //	InitE(t, &Options{
 //	    TerragruntDir: "/path/to/config",
 //	    TerragruntArgs: []string{"--log-level", "info"},
@@ -77,11 +77,11 @@ type Options struct {
 	// Example: []string{"--log-level", "info", "--no-color"}
 	TerragruntArgs []string
 
-	// Command-specific terraform flags (placed AFTER the command)
+	// Command-specific OpenTofu/Terraform flags (placed AFTER the command)
 	// Example: []string{"-upgrade=true"} for init, or []string{"plan"} for stack run
 	TerraformArgs []string
 
-	// Optional stdin to pass to Terraform commands
+	// Optional stdin to pass to OpenTofu/Terraform commands
 	Stdin io.Reader
 }
 

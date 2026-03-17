@@ -13,9 +13,9 @@ func Init(t testing.TestingT, options *Options) string {
 	return out
 }
 
-// InitE calls terragrunt run init and return stdout/stderr
+// InitE calls terragrunt run -- init and return stdout/stderr
 func InitE(t testing.TestingT, options *Options) (string, error) {
-	args := append([]string{"init"}, initArgs(options)...)
+	args := buildRunArgs(nil, "init", initArgs(options))
 	return runTerragruntCommandE(t, options, "run", args...)
 }
 
@@ -25,7 +25,7 @@ func initArgs(options *Options) []string {
 	var args []string
 
 	// Add complex configuration that requires special formatting
-	// These are terraform-specific arguments that need special formatting
+	// These are OpenTofu/Terraform-specific arguments that need special formatting
 	args = append(args, formatting.FormatBackendConfigAsArgs(options.BackendConfig)...)
 	args = append(args, formatting.FormatPluginDirAsArgs(options.PluginDir)...)
 	return args

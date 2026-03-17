@@ -12,9 +12,10 @@ func DestroyAll(t testing.TestingT, options *Options) string {
 	return out
 }
 
-// DestroyAllE runs terragrunt run --all destroy with the given options and returns stdout.
+// DestroyAllE runs terragrunt run --all -- destroy with the given options and returns stdout.
 func DestroyAllE(t testing.TestingT, options *Options) (string, error) {
-	return runTerragruntCommandE(t, options, "run", "--all", "destroy", "-auto-approve", "-input=false")
+	args := buildRunArgs([]string{"--all"}, "destroy", []string{"-auto-approve", "-input=false"})
+	return runTerragruntCommandE(t, options, "run", args...)
 }
 
 // Destroy runs terragrunt run destroy for a single unit and returns stdout/stderr.
@@ -24,7 +25,8 @@ func Destroy(t testing.TestingT, options *Options) string {
 	return out
 }
 
-// DestroyE runs terragrunt run destroy for a single unit and returns stdout/stderr.
+// DestroyE runs terragrunt run -- destroy for a single unit and returns stdout/stderr.
 func DestroyE(t testing.TestingT, options *Options) (string, error) {
-	return runTerragruntCommandE(t, options, "run", "destroy", "-auto-approve", "-input=false")
+	args := buildRunArgs(nil, "destroy", []string{"-auto-approve", "-input=false"})
+	return runTerragruntCommandE(t, options, "run", args...)
 }

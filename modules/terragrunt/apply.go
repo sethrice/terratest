@@ -13,10 +13,11 @@ func ApplyAll(t testing.TestingT, options *Options) string {
 	return out
 }
 
-// ApplyAllE runs terragrunt run --all apply with the given options and returns stdout/stderr. Note that this method does NOT call destroy and
+// ApplyAllE runs terragrunt run --all -- apply with the given options and returns stdout/stderr. Note that this method does NOT call destroy and
 // assumes the caller is responsible for cleaning up any resources created by running apply.
 func ApplyAllE(t testing.TestingT, options *Options) (string, error) {
-	return runTerragruntCommandE(t, options, "run", "--all", "apply", "-input=false", "-auto-approve")
+	args := buildRunArgs([]string{"--all"}, "apply", []string{"-input=false", "-auto-approve"})
+	return runTerragruntCommandE(t, options, "run", args...)
 }
 
 // Apply runs terragrunt run apply for a single unit and returns stdout/stderr.
@@ -26,9 +27,10 @@ func Apply(t testing.TestingT, options *Options) string {
 	return out
 }
 
-// ApplyE runs terragrunt run apply for a single unit and returns stdout/stderr.
+// ApplyE runs terragrunt run -- apply for a single unit and returns stdout/stderr.
 func ApplyE(t testing.TestingT, options *Options) (string, error) {
-	return runTerragruntCommandE(t, options, "run", "apply", "-input=false", "-auto-approve")
+	args := buildRunArgs(nil, "apply", []string{"-input=false", "-auto-approve"})
+	return runTerragruntCommandE(t, options, "run", args...)
 }
 
 // InitAndApply runs terragrunt init followed by apply for a single unit and returns the apply stdout/stderr.
