@@ -2,19 +2,16 @@ package terragrunt
 
 import (
 	"github.com/gruntwork-io/terratest/modules/testing"
-	"github.com/stretchr/testify/require"
 )
 
-// RunAll runs terragrunt run-all <command> with the given options and returns stdout/stderr.
-// This is a generic wrapper that allows running any terraform command with --all flag.
+// Deprecated: Use Run with the --all flag in tgArgs instead.
+// RunAll runs terragrunt run --all -- <command> with the given options and returns stdout/stderr.
 func RunAll(t testing.TestingT, options *Options, command string) string {
-	out, err := RunAllE(t, options, command)
-	require.NoError(t, err)
-	return out
+	return Run(t, options, []string{"--all"}, []string{command})
 }
 
-// RunAllE runs terragrunt run-all <command> with the given options and returns stdout/stderr.
-// This is a generic wrapper that allows running any terraform command with --all flag.
+// Deprecated: Use RunE with the --all flag in tgArgs instead.
+// RunAllE runs terragrunt run --all -- <command> with the given options and returns stdout/stderr.
 func RunAllE(t testing.TestingT, options *Options, command string) (string, error) {
-	return runTerragruntCommandE(t, options, command, "--all")
+	return RunE(t, options, []string{"--all"}, []string{command})
 }

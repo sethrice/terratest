@@ -5,7 +5,7 @@ Testing library for Terragrunt configurations in Go. Provides helpers for runnin
 ## Requirements
 
 - **Terragrunt** binary in PATH
-- **Terraform** or **OpenTofu** binary in PATH (Terragrunt is a wrapper and requires one of these)
+- **OpenTofu** or **Terraform** binary in PATH (Terragrunt is a wrapper and requires one of these)
 
 To specify which binary to use (terraform vs opentofu):
 ```go
@@ -86,7 +86,7 @@ The `Options` struct has two distinct parts:
 
 2. **Command-Line Arguments** (passed to terragrunt):
    - `TerragruntArgs` - global terragrunt flags (e.g., `--log-level`, `--no-color`)
-   - `TerraformArgs` - command-specific terraform flags (e.g., `-upgrade`)
+   - `TerraformArgs` - command-specific OpenTofu/Terraform flags (e.g., `-upgrade`)
 
 ### Error-Returning Variants (E-suffix)
 
@@ -105,7 +105,7 @@ require.Error(t, err)
 
 Arguments are passed in this order:
 ```
-terragrunt [TerragruntArgs] --non-interactive <command> [TerraformArgs]
+terragrunt [TerragruntArgs] --non-interactive run -- <command> [TerraformArgs]
 ```
 
 **Example:**
@@ -113,9 +113,9 @@ terragrunt [TerragruntArgs] --non-interactive <command> [TerraformArgs]
 options := &terragrunt.Options{
     TerragruntDir:  "/path/to/config",
     TerragruntArgs: []string{"--log-level", "error"},  // Global TG flags
-    TerraformArgs:  []string{"-upgrade"},              // Terraform flags
+    TerraformArgs:  []string{"-upgrade"},              // OpenTofu/Terraform flags
 }
-// Executes: terragrunt --log-level error --non-interactive init -upgrade
+// Executes: terragrunt --log-level error --non-interactive run -- init -upgrade
 ```
 
 ## Functions
@@ -140,6 +140,12 @@ Run init + command in a single call:
 - `InitAndPlan(t, options)` - Init then plan
 - `InitAndValidate(t, options)` - Init then validate
 
+### Run Command
+
+- `Run(t, options, tgArgs, tfArgs)` - Run any OpenTofu/Terraform command via `terragrunt run [tgArgs...] -- [tfArgs...]`
+
+The `--` separator disambiguates Terragrunt flags (like `--all`) from OpenTofu/Terraform flags. The OpenTofu/Terraform command (e.g. `"apply"`) should be the first element of `tfArgs`.
+
 ### Run --all Commands
 
 Work with [implicit stacks](https://terragrunt.gruntwork.io/docs/features/stacks/#implicit-stacks) (multiple units in a directory):
@@ -148,7 +154,7 @@ Work with [implicit stacks](https://terragrunt.gruntwork.io/docs/features/stacks
 - `DestroyAll(t, options)` - Destroy all modules with dependencies
 - `PlanAllExitCode(t, options)` - Plan all and return exit code (0=no changes, 2=changes, other=error)
 - `ValidateAll(t, options)` - Validate all modules
-- `RunAll(t, options, command)` - Run any terraform command with --all flag
+- `RunAll(t, options, command)` - *Deprecated: use `Run` with `--all` in tgArgs instead.* Run any OpenTofu/Terraform command with --all flag
 - `OutputAllJson(t, options)` - Get all outputs as raw JSON string (note: returns separate JSON objects per module)
 
 ### HCL Commands
@@ -270,7 +276,7 @@ func TestInfrastructureUpToDate(t *testing.T) {
 }
 ```
 
-### Using RunAll for Flexibility
+### Using Run for Flexibility
 
 ```go
 func TestCustomCommand(t *testing.T) {
@@ -280,11 +286,11 @@ func TestCustomCommand(t *testing.T) {
         TerragruntDir: "../modules",
     }
 
-    // Run any terraform command with --all
-    terragrunt.RunAll(t, options, "refresh")
+    // Run any OpenTofu/Terraform command with --all
+    terragrunt.Run(t, options, []string{"--all"}, []string{"refresh"})
 
     // Verify state is current
-    output := terragrunt.RunAll(t, options, "show")
+    output := terragrunt.Run(t, options, []string{"--all"}, []string{"show"})
     assert.Contains(t, output, "expected-resource")
 }
 ```
@@ -332,13 +338,13 @@ terragrunt.ApplyAll(t, options)
 
 ## Not Supported
 
-This module does **NOT** support:
+This module does **NOT** have dedicated helpers for:
 - `import`, `refresh`, `show`, `state`, `test` commands
 - `backend`, `exec`, `catalog`, `scaffold` commands
 - Discovery commands (`find`, `list`)
 - Configuration commands (`info`)
 
-For unsupported commands, run terragrunt directly via the `shell` module.
+For these commands, use `Run`/`RunE` or run terragrunt directly via the `shell` module.
 
 ## Compatibility
 
