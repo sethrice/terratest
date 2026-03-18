@@ -1,9 +1,10 @@
-package collections
+package collections_test
 
 import (
 	"fmt"
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/collections"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,25 +19,28 @@ func TestGetSliceLastValue(t *testing.T) {
 		expectedReturn string
 		expectedError  bool
 	}{
-		{"longSlice", "this/is/a/long/slash/separated/string/success", "/", "success", false},
-		{"shortendSlice", "this/is/a/long/slash/separated", "/", "separated", false},
-		{"dashSlice", "this-is-a-long-dash-separated-string-success", "-", "success", false},
-		{"seperatorNotPresent", "this-is-a-long-dash-separated-string-success", "/", "", true},
-		{"sourceNoSeperator", "noslicepresent", "/", "", true},
-		{"emptyStrings", "", "", "", true},
+		{testName: "longSlice", sliceSource: "this/is/a/long/slash/separated/string/success", sliceSeperator: "/", expectedReturn: "success", expectedError: false},
+		{testName: "shortendSlice", sliceSource: "this/is/a/long/slash/separated", sliceSeperator: "/", expectedReturn: "separated", expectedError: false},
+		{testName: "dashSlice", sliceSource: "this-is-a-long-dash-separated-string-success", sliceSeperator: "-", expectedReturn: "success", expectedError: false},
+		{testName: "seperatorNotPresent", sliceSource: "this-is-a-long-dash-separated-string-success", sliceSeperator: "/", expectedReturn: "", expectedError: true},
+		{testName: "sourceNoSeperator", sliceSource: "noslicepresent", sliceSeperator: "/", expectedReturn: "", expectedError: true},
+		{testName: "emptyStrings", sliceSource: "", sliceSeperator: "", expectedReturn: "", expectedError: true},
 	}
 
 	for _, tc := range testCases {
-		testFor := tc //necessary range capture
+		testFor := tc // necessary range capture
 
 		t.Run(testFor.testName, func(t *testing.T) {
-			actualReturn, err := GetSliceLastValueE(testFor.sliceSource, testFor.sliceSeperator)
+			t.Parallel()
+
+			actualReturn, err := collections.GetSliceLastValueE(testFor.sliceSource, testFor.sliceSeperator)
 			switch testFor.expectedError {
 			case true:
 				require.Error(t, err)
 			case false:
 				require.NoError(t, err)
 			}
+
 			assert.Equal(t, testFor.expectedReturn, actualReturn)
 		})
 	}
@@ -46,31 +50,34 @@ func TestGetSliceIndexValue(t *testing.T) {
 	t.Parallel()
 
 	var testCases = []struct {
-		sliceIndex     int
 		expectedReturn string
+		sliceIndex     int
 		expectedError  bool
 	}{
-		{-1, "", true},
-		{0, "this", false},
-		{4, "slash", false},
-		{7, "success", false},
-		{10, "", true},
+		{expectedReturn: "", sliceIndex: -1, expectedError: true},
+		{expectedReturn: "this", sliceIndex: 0, expectedError: false},
+		{expectedReturn: "slash", sliceIndex: 4, expectedError: false},
+		{expectedReturn: "success", sliceIndex: 7, expectedError: false},
+		{expectedReturn: "", sliceIndex: 10, expectedError: true},
 	}
 
 	sliceSource := "this/is/a/long/slash/separated/string/success"
 	sliceSeperator := "/"
 
 	for _, tc := range testCases {
-		testFor := tc //necessary range capture
+		testFor := tc // necessary range capture
 
 		t.Run(fmt.Sprintf("Index_%v", testFor.sliceIndex), func(t *testing.T) {
-			actualReturn, err := GetSliceIndexValueE(sliceSource, sliceSeperator, testFor.sliceIndex)
+			t.Parallel()
+
+			actualReturn, err := collections.GetSliceIndexValueE(sliceSource, sliceSeperator, testFor.sliceIndex)
 			switch testFor.expectedError {
 			case true:
 				require.Error(t, err)
 			case false:
 				require.NoError(t, err)
 			}
+
 			assert.Equal(t, testFor.expectedReturn, actualReturn)
 		})
 	}
