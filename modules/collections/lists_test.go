@@ -1,8 +1,10 @@
-package collections
+package collections_test
 
 import (
+	"slices"
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/collections"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -11,22 +13,24 @@ func TestListContains(t *testing.T) {
 
 	testCases := []struct {
 		description string
-		list        []string
 		element     string
+		list        []string
 		expected    bool
 	}{
-		{"empty list, empty element", []string{}, "", false},
-		{"empty list, non-empty element", []string{}, "foo", false},
-		{"list with 1 item, element matches", []string{"foo"}, "foo", true},
-		{"list with 1 item, element doesn't match", []string{"bar"}, "foo", false},
-		{"list with 3 items, element matches", []string{"bar", "foo", "baz"}, "foo", true},
-		{"list with 3 items, element doesn't match", []string{"bar", "foo", "baz"}, "nope", false},
-		{"list with 3 items, empty element", []string{"bar", "foo", "baz"}, "", false},
+		{"empty list, empty element", "", []string{}, false},
+		{"empty list, non-empty element", "foo", []string{}, false},
+		{"list with 1 item, element matches", "foo", []string{"foo"}, true},
+		{"list with 1 item, element doesn't match", "foo", []string{"bar"}, false},
+		{"list with 3 items, element matches", "foo", []string{"bar", "foo", "baz"}, true},
+		{"list with 3 items, element doesn't match", "nope", []string{"bar", "foo", "baz"}, false},
+		{"list with 3 items, empty element", "", []string{"bar", "foo", "baz"}, false},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			actual := ListContains(testCase.list, testCase.element)
+			t.Parallel()
+
+			actual := slices.Contains(testCase.list, testCase.element)
 			assert.Equal(t, testCase.expected, actual)
 		})
 	}
@@ -54,7 +58,9 @@ func TestSubtract(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			actual := ListSubtract(testCase.list1, testCase.list2)
+			t.Parallel()
+
+			actual := collections.ListSubtract(testCase.list1, testCase.list2)
 			assert.Equal(t, testCase.expected, actual)
 		})
 	}
@@ -82,7 +88,9 @@ func TestIntersection(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			actual := ListIntersection(testCase.list1, testCase.list2)
+			t.Parallel()
+
+			actual := collections.ListIntersection(testCase.list1, testCase.list2)
 			assert.Equal(t, testCase.expected, actual)
 		})
 	}

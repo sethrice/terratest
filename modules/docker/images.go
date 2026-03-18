@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
-	"github.com/gruntwork-io/terratest/modules/collections"
 	"github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/shell"
 	"github.com/gruntwork-io/terratest/modules/testing"
@@ -108,5 +108,5 @@ func DoesImageExist(t testing.TestingT, imgLabel string, logger *logger.Logger) 
 	for _, image := range images {
 		imageTags = append(imageTags, image.String())
 	}
-	return collections.ListContains(imageTags, imgLabel)
+	return slices.Contains(imageTags, imgLabel)
 }

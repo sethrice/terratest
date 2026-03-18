@@ -3,11 +3,11 @@ package terraform
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/gruntwork-io/terratest/internal/lib/formatting"
-	"github.com/gruntwork-io/terratest/modules/collections"
 )
 
 // TerraformCommandsWithLockSupport is a list of all the Terraform commands that
@@ -37,8 +37,8 @@ var TerraformCommandsWithPlanFileSupport = []string{
 func FormatArgs(options *Options, args ...string) []string {
 	var terraformArgs []string
 	commandType := args[0]
-	lockSupported := collections.ListContains(TerraformCommandsWithLockSupport, commandType)
-	planFileSupported := collections.ListContains(TerraformCommandsWithPlanFileSupport, commandType)
+	lockSupported := slices.Contains(TerraformCommandsWithLockSupport, commandType)
+	planFileSupported := slices.Contains(TerraformCommandsWithPlanFileSupport, commandType)
 
 	// Include -var and -var-file flags unless we're running 'apply' with a plan file
 	includeVars := !(commandType == "apply" && len(options.PlanFilePath) > 0)

@@ -4,9 +4,9 @@ import (
 	"io"
 	"net"
 	"reflect"
+	"slices"
 	"strconv"
 
-	"github.com/gruntwork-io/terratest/modules/collections"
 	"github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/testing"
 	"golang.org/x/crypto/ssh"
@@ -82,7 +82,7 @@ func Close(t testing.TestingT, closeable Closeable, ignoreErrors ...string) {
 		return
 	}
 
-	if err := closeable.Close(); err != nil && !collections.ListContains(ignoreErrors, err.Error()) {
+	if err := closeable.Close(); err != nil && !slices.Contains(ignoreErrors, err.Error()) {
 		logger.Default.Logf(t, "Error closing %s: %s", closeable, err.Error())
 	}
 }
