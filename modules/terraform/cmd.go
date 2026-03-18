@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strings"
 
-	"github.com/gruntwork-io/terratest/modules/collections"
 	"github.com/gruntwork-io/terratest/modules/retry"
 	"github.com/gruntwork-io/terratest/modules/shell"
 	"github.com/gruntwork-io/terratest/modules/testing"
@@ -47,7 +47,7 @@ func GetCommonOptions(options *Options, args ...string) (*Options, []string) {
 		options.TerraformBinary = DefaultExecutable
 	}
 
-	if options.Parallelism > 0 && len(args) > 0 && collections.ListContains(commandsWithParallelism, args[0]) {
+	if options.Parallelism > 0 && len(args) > 0 && slices.Contains(commandsWithParallelism, args[0]) {
 		args = append(args, fmt.Sprintf("--parallelism=%d", options.Parallelism))
 	}
 

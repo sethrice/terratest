@@ -3,9 +3,9 @@ package test_structure
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
-	"github.com/gruntwork-io/terratest/modules/collections"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -97,7 +97,7 @@ func TestFindTerraformModulePathsInRootEWithResultsExclusion(t *testing.T) {
 	require.Greater(t, len(subDirs), 0)
 	// Ensure none of the excluded paths were returned by FindTerraformModulePathsInRootE
 	for _, exclusion := range exclusions {
-		assert.False(t, collections.ListContains(subDirs, filepath.Join(projectRootDir, exclusion)))
+		assert.False(t, slices.Contains(subDirs, filepath.Join(projectRootDir, exclusion)))
 	}
 
 	// Next, call the same function but this time without exclusions and ensure that the excluded paths
@@ -109,6 +109,6 @@ func TestFindTerraformModulePathsInRootEWithResultsExclusion(t *testing.T) {
 	require.NoError(t, woExErr)
 	require.Greater(t, len(subDirsWithoutExclusions), 0)
 	for _, exclusion := range exclusions {
-		assert.True(t, collections.ListContains(subDirsWithoutExclusions, filepath.Join(projectRootDir, exclusion)))
+		assert.True(t, slices.Contains(subDirsWithoutExclusions, filepath.Join(projectRootDir, exclusion)))
 	}
 }

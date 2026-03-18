@@ -1,6 +1,7 @@
 package collections_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/collections"
@@ -29,7 +30,7 @@ func TestListContains(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			t.Parallel()
 
-			actual := collections.ListContains(testCase.list, testCase.element)
+			actual := slices.Contains(testCase.list, testCase.element)
 			assert.Equal(t, testCase.expected, actual)
 		})
 	}
