@@ -15,4 +15,3 @@ func RunAll(t testing.TestingT, options *Options, command string) string {
 func RunAllE(t testing.TestingT, options *Options, command string) (string, error) {
 	return RunE(t, options, []string{"--all"}, []string{command})
 }
-
