@@ -7,6 +7,7 @@ import (
 
 	"github.com/gruntwork-io/go-commons/errors"
 	"github.com/stretchr/testify/require"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
@@ -68,9 +69,33 @@ func GetServiceAccountAuthToken(t testing.TestingT, kubectlOptions *KubectlOptio
 
 // GetServiceAccountAuthTokenE will retrieve the ServiceAccount token from the cluster so it can be used to
 // authenticate requests as that ServiceAccount.
+// On K8s 1.24+, service account tokens are no longer auto-created as secrets, so this uses the TokenRequest API.
 func GetServiceAccountAuthTokenE(t testing.TestingT, kubectlOptions *KubectlOptions, serviceAccountName string) (string, error) {
-	// Wait for the TokenController to provision a ServiceAccount token
-	msg, err := retry.DoWithRetryE(
+	clientset, err := GetKubernetesClientFromOptionsE(t, kubectlOptions)
+	if err != nil {
+		return "", err
+	}
+
+	// First try the TokenRequest API (K8s 1.24+)
+	tokenRequest := &authenticationv1.TokenRequest{
+		Spec: authenticationv1.TokenRequestSpec{
+			// Use a long expiration for test purposes
+			ExpirationSeconds: new(int64(3600)),
+		},
+	}
+	tokenResponse, err := clientset.CoreV1().ServiceAccounts(kubectlOptions.Namespace).CreateToken(
+		context.Background(),
+		serviceAccountName,
+		tokenRequest,
+		metav1.CreateOptions{},
+	)
+	if err == nil {
+		return tokenResponse.Status.Token, nil
+	}
+
+	// Fall back to legacy secret-based tokens for older K8s versions
+	kubectlOptions.Logger.Logf(t, "TokenRequest API failed (%s), falling back to secret-based tokens", err)
+	msg, retryErr := retry.DoWithRetryE(
 		t,
 		"Waiting for ServiceAccount Token to be provisioned",
 		30,
@@ -86,12 +111,11 @@ func GetServiceAccountAuthTokenE(t testing.TestingT, kubectlOptions *KubectlOpti
 			return "Service Account has secret", nil
 		},
 	)
-	if err != nil {
-		return "", err
+	if retryErr != nil {
+		return "", retryErr
 	}
 	kubectlOptions.Logger.Logf(t, "%s", msg)
 
-	// Then get the service account token
 	serviceAccount, err := GetServiceAccountE(t, kubectlOptions, serviceAccountName)
 	if err != nil {
 		return "", err
