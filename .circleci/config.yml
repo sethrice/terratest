@@ -25,13 +25,28 @@ env: &env
 defaults: &defaults
   machine:
     enabled: true
-    image: ubuntu-2204:2024.04.1
+    image: ubuntu-2004:2022.10.1
   <<: *env
 
 setup_minikube: &setup_minikube
   command: |
     sudo apt update -y
     sudo apt install -y conntrack
+
+    # Install cri-dockerd (required for minikube none driver with K8s v1.24+)
+    CRI_DOCKERD_VERSION="0.3.16"
+    curl -sLO "https://github.com/Mirantis/cri-dockerd/releases/download/v${CRI_DOCKERD_VERSION}/cri-dockerd-${CRI_DOCKERD_VERSION}.amd64.tgz"
+    tar xzf "cri-dockerd-${CRI_DOCKERD_VERSION}.amd64.tgz"
+    sudo install -m 0755 cri-dockerd/cri-dockerd /usr/local/bin/cri-dockerd
+
+    # Set up cri-dockerd systemd service
+    curl -sLo /tmp/cri-docker.service "https://raw.githubusercontent.com/Mirantis/cri-dockerd/v${CRI_DOCKERD_VERSION}/packaging/systemd/cri-docker.service"
+    curl -sLo /tmp/cri-docker.socket "https://raw.githubusercontent.com/Mirantis/cri-dockerd/v${CRI_DOCKERD_VERSION}/packaging/systemd/cri-docker.socket"
+    sudo mv /tmp/cri-docker.service /tmp/cri-docker.socket /etc/systemd/system/
+    sudo sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now cri-docker.socket
+
     setup-minikube --k8s-version "$K8S_VERSION" --minikube-version "$MINIKUBE_VERSION"
 
 install_helm: &install_helm
