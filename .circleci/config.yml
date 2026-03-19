@@ -13,7 +13,7 @@ env: &env
     GO_VERSION: 1.26.0
     GO111MODULE: auto
     K8S_VERSION: v1.28.0  # Same as EKS
-    MINIKUBE_VERSION: v1.32.0
+    MINIKUBE_VERSION: v1.35.0
     HELM_VERSION: v3.13.1
     KUBECONFIG: /home/circleci/.kube/config
     BIN_BUILD_PARALLELISM: 3
@@ -25,7 +25,7 @@ env: &env
 defaults: &defaults
   machine:
     enabled: true
-    image: ubuntu-2004:2022.10.1
+    image: ubuntu-2204:2024.04.1
   <<: *env
 
 setup_minikube: &setup_minikube
