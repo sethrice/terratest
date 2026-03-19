@@ -18,18 +18,19 @@ import (
 
 // Command is a simpler struct for defining commands than Go's built-in Cmd.
 type Command struct {
-	Command    string            // The command to run
-	Args       []string          // The args to pass to the command
-	WorkingDir string            // The working directory
-	Env        map[string]string // Additional environment variables to set
 	// Use the specified logger for the command's output. Use logger.Discard to not print the output while executing the command.
-	Logger *logger.Logger
-
-	Stdin io.Reader
+	Logger     *logger.Logger
+	Stdin      io.Reader
+	Env        map[string]string // Additional environment variables to set
+	Command    string            // The command to run
+	WorkingDir string            // The working directory
+	Args       []string          // The args to pass to the command
 }
 
 // RunCommand runs a shell command and redirects its stdout and stderr to the stdout of the atomic script itself. If
 // there are any errors, fail the test.
+//
+//nolint:gocritic // hugeParam - changing to pointer would break public API
 func RunCommand(t testing.TestingT, command Command) {
 	err := RunCommandE(t, command)
 	require.NoError(t, err)
@@ -37,27 +38,35 @@ func RunCommand(t testing.TestingT, command Command) {
 
 // RunCommandE runs a shell command and redirects its stdout and stderr to the stdout of the atomic script itself. Any
 // returned error will be of type ErrWithCmdOutput, containing the output streams and the underlying error.
+//
+//nolint:gocritic // hugeParam - changing to pointer would break public API
 func RunCommandE(t testing.TestingT, command Command) error {
-	output, err := runCommand(t, command)
+	output, err := runCommand(t, &command)
 	if err != nil {
 		return &ErrWithCmdOutput{err, output}
 	}
+
 	return nil
 }
 
 // RunCommandAndGetOutput runs a shell command and returns its stdout and stderr as a string. The stdout and stderr of
 // that command will also be logged with Command.Log to make debugging easier. If there are any errors, fail the test.
+//
+//nolint:gocritic // hugeParam - changing to pointer would break public API
 func RunCommandAndGetOutput(t testing.TestingT, command Command) string {
 	out, err := RunCommandAndGetOutputE(t, command)
 	require.NoError(t, err)
+
 	return out
 }
 
 // RunCommandAndGetOutputE runs a shell command and returns its stdout and stderr as a string. The stdout and stderr of
 // that command will also be logged with Command.Log to make debugging easier. Any returned error will be of type
 // ErrWithCmdOutput, containing the output streams and the underlying error.
+//
+//nolint:gocritic // hugeParam - changing to pointer would break public API
 func RunCommandAndGetOutputE(t testing.TestingT, command Command) (string, error) {
-	output, err := runCommand(t, command)
+	output, err := runCommand(t, &command)
 	if err != nil {
 		return output.Combined(), &ErrWithCmdOutput{err, output}
 	}
@@ -68,17 +77,22 @@ func RunCommandAndGetOutputE(t testing.TestingT, command Command) (string, error
 // RunCommandAndGetStdOut runs a shell command and returns solely its stdout (but not stderr) as a string. The stdout and
 // stderr of that command will also be logged with Command.Log to make debugging easier. If there are any errors, fail
 // the test.
+//
+//nolint:gocritic // hugeParam - changing to pointer would break public API
 func RunCommandAndGetStdOut(t testing.TestingT, command Command) string {
 	output, err := RunCommandAndGetStdOutE(t, command)
 	require.NoError(t, err)
+
 	return output
 }
 
 // RunCommandAndGetStdOutE runs a shell command and returns solely its stdout (but not stderr) as a string. The stdout
 // and stderr of that command will also be printed to the stdout and stderr of this Go program to make debugging easier.
 // Any returned error will be of type ErrWithCmdOutput, containing the output streams and the underlying error.
+//
+//nolint:gocritic // hugeParam - changing to pointer would break public API
 func RunCommandAndGetStdOutE(t testing.TestingT, command Command) (string, error) {
-	output, err := runCommand(t, command)
+	output, err := runCommand(t, &command)
 	if err != nil {
 		return output.Stdout(), &ErrWithCmdOutput{err, output}
 	}
@@ -89,17 +103,22 @@ func RunCommandAndGetStdOutE(t testing.TestingT, command Command) (string, error
 // RunCommandAndGetStdOutErr runs a shell command and returns solely its stdout and stderr as a string. The stdout and
 // stderr of that command will also be logged with Command.Log to make debugging easier. If there are any errors, fail
 // the test.
+//
+//nolint:gocritic // hugeParam - changing to pointer would break public API
 func RunCommandAndGetStdOutErr(t testing.TestingT, command Command) (stdout string, stderr string) {
 	stdout, stderr, err := RunCommandAndGetStdOutErrE(t, command)
 	require.NoError(t, err)
+
 	return stdout, stderr
 }
 
 // RunCommandAndGetStdOutErrE runs a shell command and returns solely its stdout and stderr as a string. The stdout
 // and stderr of that command will also be printed to the stdout and stderr of this Go program to make debugging easier.
 // Any returned error will be of type ErrWithCmdOutput, containing the output streams and the underlying error.
+//
+//nolint:gocritic // hugeParam - changing to pointer would break public API
 func RunCommandAndGetStdOutErrE(t testing.TestingT, command Command) (stdout string, stderr string, err error) {
-	output, err := runCommand(t, command)
+	output, err := runCommand(t, &command)
 	if err != nil {
 		return output.Stdout(), output.Stderr(), &ErrWithCmdOutput{err, output}
 	}
@@ -119,16 +138,18 @@ func (e *ErrWithCmdOutput) Error() string {
 // runCommand runs a shell command and stores each line from stdout and stderr in Output. Depending on the logger, the
 // stdout and stderr of that command will also be printed to the stdout and stderr of this Go program to make debugging
 // easier.
-func runCommand(t testing.TestingT, command Command) (*output, error) {
+func runCommand(t testing.TestingT, command *Command) (*output, error) {
 	command.Logger.Logf(t, "Running command %s with args %s", command.Command, command.Args)
 
-	cmd := exec.Command(command.Command, command.Args...)
+	cmd := exec.Command(command.Command, command.Args...) //nolint:noctx // adding context would require public API change
+
 	cmd.Dir = command.WorkingDir
 	if command.Stdin != nil {
 		cmd.Stdin = command.Stdin
 	} else {
 		cmd.Stdin = os.Stdin
 	}
+
 	cmd.Env = formatEnvVars(command)
 
 	stdout, err := cmd.StdoutPipe()
@@ -163,21 +184,28 @@ func readStdoutAndStderr(t testing.TestingT, log *logger.Logger, stdout, stderr 
 
 	wg := &sync.WaitGroup{}
 
-	wg.Add(2)
+	wg.Add(2) //nolint:mnd // 2 goroutines: one for stdout, one for stderr
+
 	var stdoutErr, stderrErr error
+
 	go func() {
 		defer wg.Done()
+
 		stdoutErr = readData(t, log, stdoutReader, out.stdout)
 	}()
+
 	go func() {
 		defer wg.Done()
+
 		stderrErr = readData(t, log, stderrReader, out.stderr)
 	}()
+
 	wg.Wait()
 
 	if stdoutErr != nil {
 		return out, stdoutErr
 	}
+
 	if stderrErr != nil {
 		return out, stderrErr
 	}
@@ -186,8 +214,11 @@ func readStdoutAndStderr(t testing.TestingT, log *logger.Logger, stdout, stderr 
 }
 
 func readData(t testing.TestingT, log *logger.Logger, reader *bufio.Reader, writer io.StringWriter) error {
-	var line string
-	var readErr error
+	var (
+		line    string
+		readErr error
+	)
+
 	for {
 		line, readErr = reader.ReadString('\n')
 
@@ -219,21 +250,25 @@ func readData(t testing.TestingT, log *logger.Logger, reader *bufio.Reader, writ
 			break
 		}
 	}
+
 	if readErr != io.EOF {
 		return readErr
 	}
+
 	return nil
 }
 
 // GetExitCodeForRunCommandError tries to read the exit code for the error object returned from running a shell command. This is a bit tricky to do
 // in a way that works across platforms.
 func GetExitCodeForRunCommandError(err error) (int, error) {
-	if errWithOutput, ok := err.(*ErrWithCmdOutput); ok {
+	var errWithOutput *ErrWithCmdOutput
+	if errors.As(err, &errWithOutput) {
 		err = errWithOutput.Underlying
 	}
 
 	// http://stackoverflow.com/a/10385867/483528
-	if exitErr, ok := err.(*exec.ExitError); ok {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
 		// The program has exited with an exit code != 0
 
 		// This works on both Unix and Windows. Although package
@@ -243,16 +278,18 @@ func GetExitCodeForRunCommandError(err error) (int, error) {
 		if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
 			return status.ExitStatus(), nil
 		}
+
 		return 1, errors.New("could not determine exit code")
 	}
 
 	return 0, nil
 }
 
-func formatEnvVars(command Command) []string {
+func formatEnvVars(command *Command) []string {
 	env := os.Environ()
 	for key, value := range command.Env {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}
+
 	return env
 }

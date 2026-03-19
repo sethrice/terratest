@@ -1,7 +1,8 @@
-package shell
+package shell_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -12,18 +13,19 @@ import (
 
 	"github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/random"
+	"github.com/gruntwork-io/terratest/modules/shell"
 )
 
 func TestRunCommandAndGetOutput(t *testing.T) {
 	t.Parallel()
 
 	text := "Hello, World"
-	cmd := Command{
+	cmd := shell.Command{
 		Command: "echo",
 		Args:    []string{text},
 	}
 
-	out := RunCommandAndGetOutput(t, cmd)
+	out := shell.RunCommandAndGetOutput(t, cmd)
 	assert.Equal(t, text, strings.TrimSpace(out))
 }
 
@@ -54,37 +56,38 @@ echo_stderr
 		stderrText,
 		stdoutText,
 	)
-	cmd := Command{
+	cmd := shell.Command{
 		Command: "bash",
 		Args:    []string{"-c", bashCode},
 	}
 
-	out := RunCommandAndGetOutput(t, cmd)
+	out := shell.RunCommandAndGetOutput(t, cmd)
 	assert.Equal(t, expectedText, strings.TrimSpace(out))
 }
 
 func TestRunCommandGetExitCode(t *testing.T) {
 	t.Parallel()
 
-	cmd := Command{
+	cmd := shell.Command{
 		Command: "bash",
 		Args:    []string{"-c", "exit 42"},
 		Logger:  logger.Discard,
 	}
 
-	out, err := RunCommandAndGetOutputE(t, cmd)
-	assert.Equal(t, "", out)
-	assert.NotNil(t, err)
-	code, err := GetExitCodeForRunCommandError(err)
-	assert.Nil(t, err)
-	assert.Equal(t, code, 42)
+	out, err := shell.RunCommandAndGetOutputE(t, cmd)
+	assert.Empty(t, out)
+	require.Error(t, err)
+
+	code, err := shell.GetExitCodeForRunCommandError(err)
+	require.NoError(t, err)
+	assert.Equal(t, 42, code)
 }
 
 func TestRunCommandAndGetOutputConcurrency(t *testing.T) {
 	t.Parallel()
 
-	uniqueStderr := random.UniqueId()
-	uniqueStdout := random.UniqueId()
+	uniqueStderr := random.UniqueID()
+	uniqueStdout := random.UniqueID()
 
 	bashCode := fmt.Sprintf(`
 echo_stderr(){
@@ -105,17 +108,19 @@ wait
 		uniqueStderr,
 		uniqueStdout,
 	)
-	cmd := Command{
+	cmd := shell.Command{
 		Command: "bash",
 		Args:    []string{"-c", bashCode},
 		Logger:  logger.Discard,
 	}
 
-	out := RunCommandAndGetOutput(t, cmd)
+	out := shell.RunCommandAndGetOutput(t, cmd)
+
 	stdoutReg := regexp.MustCompile(uniqueStdout)
 	stderrReg := regexp.MustCompile(uniqueStderr)
-	assert.Equal(t, 500, len(stdoutReg.FindAllString(out, -1)))
-	assert.Equal(t, 500, len(stderrReg.FindAllString(out, -1)))
+
+	assert.Len(t, stdoutReg.FindAllString(out, -1), 500)
+	assert.Len(t, stderrReg.FindAllString(out, -1), 500)
 }
 
 func TestRunCommandWithHugeLineOutput(t *testing.T) {
@@ -130,16 +135,17 @@ done
 echo
 `
 
-	cmd := Command{
+	cmd := shell.Command{
 		Command: "bash",
 		Args:    []string{"-c", bashCode},
 		Logger:  logger.Discard, // don't print that line to stdout
 	}
 
-	out, err := RunCommandAndGetOutputE(t, cmd)
-	assert.NoError(t, err)
+	out, err := shell.RunCommandAndGetOutputE(t, cmd)
+	require.NoError(t, err)
 
 	var buffer bytes.Buffer
+
 	for i := 0; i <= 35000; i++ {
 		buffer.WriteString("foo")
 	}
@@ -151,15 +157,15 @@ echo
 func TestRunCommandOutputError(t *testing.T) {
 	t.Parallel()
 
-	cmd := Command{
+	cmd := shell.Command{
 		Command: "thisbinarydoesnotexistbecausenobodyusesnamesthatlong",
 		Args:    []string{"-no-flag"},
 		Logger:  logger.Discard,
 	}
 
-	out, err := RunCommandAndGetOutputE(t, cmd)
-	assert.Equal(t, "", out)
-	assert.NotNil(t, err)
+	out, err := shell.RunCommandAndGetOutputE(t, cmd)
+	assert.Empty(t, out)
+	assert.Error(t, err)
 }
 
 func TestCommandOutputType(t *testing.T) {
@@ -168,17 +174,17 @@ func TestCommandOutputType(t *testing.T) {
 	stdout := "hello world"
 	stderr := "this command has failed"
 
-	_, err := RunCommandAndGetOutputE(t, Command{
+	_, err := shell.RunCommandAndGetOutputE(t, shell.Command{
 		Command: "sh",
 		Args:    []string{"-c", `echo "` + stdout + `" && echo "` + stderr + `" >&2 && exit 1`},
 		Logger:  logger.Discard,
 	})
-
 	if err != nil {
-		o, ok := err.(*ErrWithCmdOutput)
-		if !ok {
+		var o *shell.ErrWithCmdOutput
+		if !errors.As(err, &o) {
 			t.Fatalf("did not get correct type. got=%T", err)
 		}
+
 		assert.Len(t, o.Output.Stdout(), len(stdout))
 		assert.Len(t, o.Output.Stderr(), len(stderr))
 		assert.Len(t, o.Output.Combined(), len(stdout)+len(stderr)+1) // +1 for newline
@@ -190,36 +196,39 @@ func TestCommandWithStdoutAndStdErr(t *testing.T) {
 
 	stdout := "hello world"
 	stderr := "this command has failed"
-	command := Command{
+	command := shell.Command{
 		Command: "sh",
 		Args:    []string{"-c", `echo "` + stdout + `" && echo "` + stderr + `" >&2`},
 		Logger:  logger.Discard,
 	}
 
 	t.Run("MustNotError", func(t *testing.T) {
-		ostdout, ostderr := RunCommandAndGetStdOutErr(t, command)
+		t.Parallel()
+
+		ostdout, ostderr := shell.RunCommandAndGetStdOutErr(t, command)
 		assert.Equal(t, stdout, ostdout)
 		assert.Equal(t, stderr, ostderr)
 	})
 
 	t.Run("ReturnError", func(t *testing.T) {
-		ostdout, ostderr, err := RunCommandAndGetStdOutErrE(t, command)
+		t.Parallel()
+
+		ostdout, ostderr, err := shell.RunCommandAndGetStdOutErrE(t, command)
 		require.NoError(t, err)
 		assert.Equal(t, stdout, ostdout)
 		assert.Equal(t, stderr, ostderr)
 	})
-
 }
 
 func TestRunCommandWithStdinAndGetOutput(t *testing.T) {
 	t.Parallel()
 
 	text := "Hello, World"
-	cmd := Command{
+	cmd := shell.Command{
 		Command: "cat",
 		Stdin:   strings.NewReader(text),
 	}
 
-	out := RunCommandAndGetOutput(t, cmd)
+	out := shell.RunCommandAndGetOutput(t, cmd)
 	assert.Equal(t, text, strings.TrimSpace(out))
 }
