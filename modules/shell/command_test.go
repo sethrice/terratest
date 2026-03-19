@@ -2,6 +2,7 @@ package shell_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -20,12 +21,12 @@ func TestRunCommandAndGetOutput(t *testing.T) {
 	t.Parallel()
 
 	text := "Hello, World"
-	cmd := shell.Command{
+	cmd := &shell.Command{
 		Command: "echo",
 		Args:    []string{text},
 	}
 
-	out := shell.RunCommandAndGetOutput(t, cmd)
+	out := shell.RunCommandContextAndGetOutput(t, context.Background(), cmd)
 	assert.Equal(t, text, strings.TrimSpace(out))
 }
 
@@ -56,25 +57,25 @@ echo_stderr
 		stderrText,
 		stdoutText,
 	)
-	cmd := shell.Command{
+	cmd := &shell.Command{
 		Command: "bash",
 		Args:    []string{"-c", bashCode},
 	}
 
-	out := shell.RunCommandAndGetOutput(t, cmd)
+	out := shell.RunCommandContextAndGetOutput(t, context.Background(), cmd)
 	assert.Equal(t, expectedText, strings.TrimSpace(out))
 }
 
 func TestRunCommandGetExitCode(t *testing.T) {
 	t.Parallel()
 
-	cmd := shell.Command{
+	cmd := &shell.Command{
 		Command: "bash",
 		Args:    []string{"-c", "exit 42"},
 		Logger:  logger.Discard,
 	}
 
-	out, err := shell.RunCommandAndGetOutputE(t, cmd)
+	out, err := shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
 	assert.Empty(t, out)
 	require.Error(t, err)
 
@@ -108,13 +109,13 @@ wait
 		uniqueStderr,
 		uniqueStdout,
 	)
-	cmd := shell.Command{
+	cmd := &shell.Command{
 		Command: "bash",
 		Args:    []string{"-c", bashCode},
 		Logger:  logger.Discard,
 	}
 
-	out := shell.RunCommandAndGetOutput(t, cmd)
+	out := shell.RunCommandContextAndGetOutput(t, context.Background(), cmd)
 
 	stdoutReg := regexp.MustCompile(uniqueStdout)
 	stderrReg := regexp.MustCompile(uniqueStderr)
@@ -135,13 +136,13 @@ done
 echo
 `
 
-	cmd := shell.Command{
+	cmd := &shell.Command{
 		Command: "bash",
 		Args:    []string{"-c", bashCode},
 		Logger:  logger.Discard, // don't print that line to stdout
 	}
 
-	out, err := shell.RunCommandAndGetOutputE(t, cmd)
+	out, err := shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
 	require.NoError(t, err)
 
 	var buffer bytes.Buffer
@@ -157,13 +158,13 @@ echo
 func TestRunCommandOutputError(t *testing.T) {
 	t.Parallel()
 
-	cmd := shell.Command{
+	cmd := &shell.Command{
 		Command: "thisbinarydoesnotexistbecausenobodyusesnamesthatlong",
 		Args:    []string{"-no-flag"},
 		Logger:  logger.Discard,
 	}
 
-	out, err := shell.RunCommandAndGetOutputE(t, cmd)
+	out, err := shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
 	assert.Empty(t, out)
 	assert.Error(t, err)
 }
@@ -174,7 +175,7 @@ func TestCommandOutputType(t *testing.T) {
 	stdout := "hello world"
 	stderr := "this command has failed"
 
-	_, err := shell.RunCommandAndGetOutputE(t, shell.Command{
+	_, err := shell.RunCommandContextAndGetOutputE(t, context.Background(), &shell.Command{
 		Command: "sh",
 		Args:    []string{"-c", `echo "` + stdout + `" && echo "` + stderr + `" >&2 && exit 1`},
 		Logger:  logger.Discard,
@@ -196,7 +197,7 @@ func TestCommandWithStdoutAndStdErr(t *testing.T) {
 
 	stdout := "hello world"
 	stderr := "this command has failed"
-	command := shell.Command{
+	command := &shell.Command{
 		Command: "sh",
 		Args:    []string{"-c", `echo "` + stdout + `" && echo "` + stderr + `" >&2`},
 		Logger:  logger.Discard,
@@ -205,7 +206,7 @@ func TestCommandWithStdoutAndStdErr(t *testing.T) {
 	t.Run("MustNotError", func(t *testing.T) {
 		t.Parallel()
 
-		ostdout, ostderr := shell.RunCommandAndGetStdOutErr(t, command)
+		ostdout, ostderr := shell.RunCommandContextAndGetStdOutErr(t, context.Background(), command)
 		assert.Equal(t, stdout, ostdout)
 		assert.Equal(t, stderr, ostderr)
 	})
@@ -213,7 +214,7 @@ func TestCommandWithStdoutAndStdErr(t *testing.T) {
 	t.Run("ReturnError", func(t *testing.T) {
 		t.Parallel()
 
-		ostdout, ostderr, err := shell.RunCommandAndGetStdOutErrE(t, command)
+		ostdout, ostderr, err := shell.RunCommandContextAndGetStdOutErrE(t, context.Background(), command)
 		require.NoError(t, err)
 		assert.Equal(t, stdout, ostdout)
 		assert.Equal(t, stderr, ostderr)
@@ -224,11 +225,11 @@ func TestRunCommandWithStdinAndGetOutput(t *testing.T) {
 	t.Parallel()
 
 	text := "Hello, World"
-	cmd := shell.Command{
+	cmd := &shell.Command{
 		Command: "cat",
 		Stdin:   strings.NewReader(text),
 	}
 
-	out := shell.RunCommandAndGetOutput(t, cmd)
+	out := shell.RunCommandContextAndGetOutput(t, context.Background(), cmd)
 	assert.Equal(t, text, strings.TrimSpace(out))
 }
