@@ -1,43 +1,50 @@
-package retry
+package retry_test
 
 import (
-	"fmt"
+	"errors"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/gruntwork-io/terratest/modules/retry"
 )
 
 func TestDoWithRetry(t *testing.T) {
 	t.Parallel()
 
 	expectedOutput := "expected"
-	expectedError := fmt.Errorf("expected error")
+	expectedError := errors.New("expected error")
 
 	actionAlwaysReturnsExpected := func() (string, error) { return expectedOutput, nil }
 	actionAlwaysReturnsError := func() (string, error) { return expectedOutput, expectedError }
 
 	createActionThatReturnsExpectedAfterFiveRetries := func() func() (string, error) {
 		count := 0
+
 		return func() (string, error) {
 			count++
+
 			if count > 5 {
 				return expectedOutput, nil
 			}
+
 			return expectedOutput, expectedError
 		}
 	}
 
 	testCases := []struct {
-		description   string
-		maxRetries    int
 		expectedError error
 		action        func() (string, error)
+		description   string
+		maxRetries    int
 	}{
-		{"Return value on first try", 10, nil, actionAlwaysReturnsExpected},
-		{"Return error on all retries", 10, MaxRetriesExceeded{Description: "Return error on all retries", MaxRetries: 10}, actionAlwaysReturnsError},
-		{"Return value after 5 retries", 10, nil, createActionThatReturnsExpectedAfterFiveRetries()},
-		{"Return value after 5 retries, but only do 4 retries", 4, MaxRetriesExceeded{Description: "Return value after 5 retries, but only do 4 retries", MaxRetries: 4}, createActionThatReturnsExpectedAfterFiveRetries()},
+		{description: "Return value on first try", maxRetries: 10, action: actionAlwaysReturnsExpected},
+		{description: "Return error on all retries", maxRetries: 10, expectedError: retry.MaxRetriesExceeded{Description: "Return error on all retries", MaxRetries: 10}, action: actionAlwaysReturnsError},
+		{description: "Return value after 5 retries", maxRetries: 10, action: createActionThatReturnsExpectedAfterFiveRetries()},
+		{description: "Return value after 5 retries, but only do 4 retries", maxRetries: 4, expectedError: retry.MaxRetriesExceeded{Description: "Return value after 5 retries, but only do 4 retries", MaxRetries: 4}, action: createActionThatReturnsExpectedAfterFiveRetries()},
 	}
 
 	for _, testCase := range testCases {
@@ -46,12 +53,13 @@ func TestDoWithRetry(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			t.Parallel()
 
-			actualOutput, err := DoWithRetryE(t, testCase.description, testCase.maxRetries, 1*time.Millisecond, testCase.action)
+			actualOutput, err := retry.DoWithRetryE(t, testCase.description, testCase.maxRetries, 1*time.Millisecond, testCase.action)
 			assert.Equal(t, expectedOutput, actualOutput)
+
 			if testCase.expectedError != nil {
 				assert.Equal(t, testCase.expectedError, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, expectedOutput, actualOutput)
 			}
 		})
@@ -62,7 +70,7 @@ func TestDoWithTimeout(t *testing.T) {
 	t.Parallel()
 
 	expectedOutput := "expected"
-	expectedError := fmt.Errorf("expected error")
+	expectedError := errors.New("expected error")
 
 	actionReturnsValueImmediately := func() (string, error) { return expectedOutput, nil }
 	actionReturnsErrorImmediately := func() (string, error) { return "", expectedError }
@@ -70,6 +78,7 @@ func TestDoWithTimeout(t *testing.T) {
 	createActionThatReturnsValueAfterDelay := func(delay time.Duration) func() (string, error) {
 		return func() (string, error) {
 			time.Sleep(delay)
+
 			return expectedOutput, nil
 		}
 	}
@@ -77,22 +86,23 @@ func TestDoWithTimeout(t *testing.T) {
 	createActionThatReturnsErrorAfterDelay := func(delay time.Duration) func() (string, error) {
 		return func() (string, error) {
 			time.Sleep(delay)
+
 			return "", expectedError
 		}
 	}
 
 	testCases := []struct {
-		description   string
-		timeout       time.Duration
 		expectedError error
 		action        func() (string, error)
+		description   string
+		timeout       time.Duration
 	}{
-		{"Returns value immediately", 5 * time.Second, nil, actionReturnsValueImmediately},
-		{"Returns error immediately", 5 * time.Second, expectedError, actionReturnsErrorImmediately},
-		{"Returns value after 2 seconds", 5 * time.Second, nil, createActionThatReturnsValueAfterDelay(2 * time.Second)},
-		{"Returns error after 2 seconds", 5 * time.Second, expectedError, createActionThatReturnsErrorAfterDelay(2 * time.Second)},
-		{"Returns value after timeout exceeded", 5 * time.Second, TimeoutExceeded{Description: "Returns value after timeout exceeded", Timeout: 5 * time.Second}, createActionThatReturnsValueAfterDelay(10 * time.Second)},
-		{"Returns error after timeout exceeded", 5 * time.Second, TimeoutExceeded{Description: "Returns error after timeout exceeded", Timeout: 5 * time.Second}, createActionThatReturnsErrorAfterDelay(10 * time.Second)},
+		{description: "Returns value immediately", timeout: 5 * time.Second, action: actionReturnsValueImmediately},
+		{description: "Returns error immediately", timeout: 5 * time.Second, expectedError: expectedError, action: actionReturnsErrorImmediately},
+		{description: "Returns value after 2 seconds", timeout: 5 * time.Second, action: createActionThatReturnsValueAfterDelay(2 * time.Second)},
+		{description: "Returns error after 2 seconds", timeout: 5 * time.Second, expectedError: expectedError, action: createActionThatReturnsErrorAfterDelay(2 * time.Second)},
+		{description: "Returns value after timeout exceeded", timeout: 5 * time.Second, expectedError: retry.TimeoutExceeded{Description: "Returns value after timeout exceeded", Timeout: 5 * time.Second}, action: createActionThatReturnsValueAfterDelay(10 * time.Second)},
+		{description: "Returns error after timeout exceeded", timeout: 5 * time.Second, expectedError: retry.TimeoutExceeded{Description: "Returns error after timeout exceeded", Timeout: 5 * time.Second}, action: createActionThatReturnsErrorAfterDelay(10 * time.Second)},
 	}
 
 	for _, testCase := range testCases {
@@ -101,11 +111,11 @@ func TestDoWithTimeout(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			t.Parallel()
 
-			actualOutput, err := DoWithTimeoutE(t, testCase.description, testCase.timeout, testCase.action)
+			actualOutput, err := retry.DoWithTimeoutE(t, testCase.description, testCase.timeout, testCase.action)
 			if testCase.expectedError != nil {
 				assert.Equal(t, testCase.expectedError, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, expectedOutput, actualOutput)
 			}
 		})
@@ -119,7 +129,7 @@ func TestDoInBackgroundUntilStopped(t *testing.T) {
 	waitStop := sleepBetweenRetries*2 + sleepBetweenRetries/2
 	counter := 0
 
-	stop := DoInBackgroundUntilStopped(t, t.Name(), sleepBetweenRetries, func() {
+	stop := retry.DoInBackgroundUntilStopped(t, t.Name(), sleepBetweenRetries, func() {
 		counter++
 		t.Log(time.Now(), counter)
 	})
@@ -136,8 +146,8 @@ func TestDoWithRetryableErrors(t *testing.T) {
 	t.Parallel()
 
 	expectedOutput := "this is the expected output"
-	expectedError := fmt.Errorf("expected error")
-	unexpectedError := fmt.Errorf("some other error")
+	expectedError := errors.New("expected error")
+	unexpectedError := errors.New("some other error")
 
 	actionAlwaysReturnsExpected := func() (string, error) { return expectedOutput, nil }
 	actionAlwaysReturnsExpectedError := func() (string, error) { return expectedOutput, expectedError }
@@ -145,33 +155,42 @@ func TestDoWithRetryableErrors(t *testing.T) {
 
 	createActionThatReturnsExpectedAfterFiveRetriesOfExpectedErrors := func() func() (string, error) {
 		count := 0
+
 		return func() (string, error) {
 			count++
+
 			if count > 5 {
 				return expectedOutput, nil
 			}
+
 			return expectedOutput, expectedError
 		}
 	}
 
 	createActionThatReturnsExpectedAfterFiveRetriesOfUnexpectedErrors := func() func() (string, error) {
 		count := 0
+
 		return func() (string, error) {
 			count++
+
 			if count > 5 {
 				return expectedOutput, nil
 			}
+
 			return expectedOutput, unexpectedError
 		}
 	}
 
 	createActionThatReturnsErrorCounterAfterFiveRetriesOfExpectedErrors := func() func() (string, error) {
 		count := 0
+
 		return func() (string, error) {
 			count++
+
 			if count > 5 {
 				return expectedOutput, ErrorCounter(count)
 			}
+
 			return expectedOutput, expectedError
 		}
 	}
@@ -211,32 +230,32 @@ func TestDoWithRetryableErrors(t *testing.T) {
 	}
 
 	testCases := []struct {
-		description     string
-		retryableErrors map[string]string
-		maxRetries      int
 		expectedError   error
+		retryableErrors map[string]string
 		action          func() (string, error)
+		description     string
+		maxRetries      int
 	}{
-		{"Return value on first try", noRetryableErrors, 10, nil, actionAlwaysReturnsExpected},
-		{"Return expected error, but no retryable errors requested", noRetryableErrors, 10, FatalError{Underlying: expectedError}, actionAlwaysReturnsExpectedError},
-		{"Return expected error, but retryable errors do not match", retryOnErrorsThatWontMatch, 10, FatalError{Underlying: expectedError}, actionAlwaysReturnsExpectedError},
-		{"Return expected error on all retries, use match all regex", retryOnAllErrors, 10, MaxRetriesExceeded{Description: "Return expected error on all retries, use match all regex", MaxRetries: 10}, actionAlwaysReturnsExpectedError},
-		{"Return expected error on all retries, use match exactly regex", retryOnExpectedErrorExactMatch, 3, MaxRetriesExceeded{Description: "Return expected error on all retries, use match exactly regex", MaxRetries: 3}, actionAlwaysReturnsExpectedError},
-		{"Return expected error on all retries, use regex", retryOnExpectedErrorRegexpMatch, 1, MaxRetriesExceeded{Description: "Return expected error on all retries, use regex", MaxRetries: 1}, actionAlwaysReturnsExpectedError},
-		{"Return expected error on all retries, use regex amidst others", retryOnExpectedErrorRegexpMatchWithOthers, 1, MaxRetriesExceeded{Description: "Return expected error on all retries, use regex amidst others", MaxRetries: 1}, actionAlwaysReturnsExpectedError},
-		{"Return unexpected error on all retries, but match stdout exactly", retryOnExpectedStdoutExactMatch, 10, MaxRetriesExceeded{Description: "Return unexpected error on all retries, but match stdout exactly", MaxRetries: 10}, actionAlwaysReturnsUnexpectedError},
-		{"Return unexpected error on all retries, but match stdout with regex", retryOnExpectedStdoutRegex, 3, MaxRetriesExceeded{Description: "Return unexpected error on all retries, but match stdout with regex", MaxRetries: 3}, actionAlwaysReturnsUnexpectedError},
-		{"Return value after 5 retries with expected error, match all", retryOnAllErrors, 10, nil, createActionThatReturnsExpectedAfterFiveRetriesOfExpectedErrors()},
-		{"Return value after 5 retries with expected error, match exactly", retryOnExpectedErrorExactMatch, 10, nil, createActionThatReturnsExpectedAfterFiveRetriesOfExpectedErrors()},
-		{"Return value after 5 retries with expected error, match regex", retryOnExpectedErrorRegexpMatch, 10, nil, createActionThatReturnsExpectedAfterFiveRetriesOfExpectedErrors()},
-		{"Return value after 5 retries with expected error, match multiple regex", retryOnExpectedErrorRegexpMatchWithOthers, 10, nil, createActionThatReturnsExpectedAfterFiveRetriesOfExpectedErrors()},
-		{"Return value after 5 retries with expected error, match stdout exactly", retryOnExpectedStdoutExactMatch, 10, nil, createActionThatReturnsExpectedAfterFiveRetriesOfUnexpectedErrors()},
-		{"Return value after 5 retries with expected error, match stdout with regex", retryOnExpectedStdoutRegex, 10, nil, createActionThatReturnsExpectedAfterFiveRetriesOfUnexpectedErrors()},
-		{"Return value after 5 retries with expected error, match exactly, but only do 4 retries", retryOnExpectedErrorExactMatch, 4, MaxRetriesExceeded{Description: "Return value after 5 retries with expected error, match exactly, but only do 4 retries", MaxRetries: 4}, createActionThatReturnsExpectedAfterFiveRetriesOfExpectedErrors()},
-		{"Return unexpected error after 5 retries with expected error, match exactly", retryOnExpectedErrorExactMatch, 10, FatalError{Underlying: ErrorCounter(6)}, createActionThatReturnsErrorCounterAfterFiveRetriesOfExpectedErrors()},
-		{"Return unexpected error after 5 retries with expected error, match regex", retryOnExpectedErrorRegexpMatch, 10, FatalError{Underlying: ErrorCounter(6)}, createActionThatReturnsErrorCounterAfterFiveRetriesOfExpectedErrors()},
-		{"Return unexpected error after 5 retries with expected error, match multiple regex", retryOnExpectedErrorRegexpMatchWithOthers, 10, FatalError{Underlying: ErrorCounter(6)}, createActionThatReturnsErrorCounterAfterFiveRetriesOfExpectedErrors()},
-		{"Return unexpected error after 5 retries with expected error, match all", retryOnAllErrors, 10, MaxRetriesExceeded{Description: "Return unexpected error after 5 retries with expected error, match all", MaxRetries: 10}, createActionThatReturnsErrorCounterAfterFiveRetriesOfExpectedErrors()},
+		{description: "Return value on first try", retryableErrors: noRetryableErrors, maxRetries: 10, action: actionAlwaysReturnsExpected},
+		{description: "Return expected error, but no retryable errors requested", retryableErrors: noRetryableErrors, maxRetries: 10, expectedError: retry.FatalError{Underlying: expectedError}, action: actionAlwaysReturnsExpectedError},
+		{description: "Return expected error, but retryable errors do not match", retryableErrors: retryOnErrorsThatWontMatch, maxRetries: 10, expectedError: retry.FatalError{Underlying: expectedError}, action: actionAlwaysReturnsExpectedError},
+		{description: "Return expected error on all retries, use match all regex", retryableErrors: retryOnAllErrors, maxRetries: 10, expectedError: retry.MaxRetriesExceeded{Description: "Return expected error on all retries, use match all regex", MaxRetries: 10}, action: actionAlwaysReturnsExpectedError},
+		{description: "Return expected error on all retries, use match exactly regex", retryableErrors: retryOnExpectedErrorExactMatch, maxRetries: 3, expectedError: retry.MaxRetriesExceeded{Description: "Return expected error on all retries, use match exactly regex", MaxRetries: 3}, action: actionAlwaysReturnsExpectedError},
+		{description: "Return expected error on all retries, use regex", retryableErrors: retryOnExpectedErrorRegexpMatch, maxRetries: 1, expectedError: retry.MaxRetriesExceeded{Description: "Return expected error on all retries, use regex", MaxRetries: 1}, action: actionAlwaysReturnsExpectedError},
+		{description: "Return expected error on all retries, use regex amidst others", retryableErrors: retryOnExpectedErrorRegexpMatchWithOthers, maxRetries: 1, expectedError: retry.MaxRetriesExceeded{Description: "Return expected error on all retries, use regex amidst others", MaxRetries: 1}, action: actionAlwaysReturnsExpectedError},
+		{description: "Return unexpected error on all retries, but match stdout exactly", retryableErrors: retryOnExpectedStdoutExactMatch, maxRetries: 10, expectedError: retry.MaxRetriesExceeded{Description: "Return unexpected error on all retries, but match stdout exactly", MaxRetries: 10}, action: actionAlwaysReturnsUnexpectedError},
+		{description: "Return unexpected error on all retries, but match stdout with regex", retryableErrors: retryOnExpectedStdoutRegex, maxRetries: 3, expectedError: retry.MaxRetriesExceeded{Description: "Return unexpected error on all retries, but match stdout with regex", MaxRetries: 3}, action: actionAlwaysReturnsUnexpectedError},
+		{description: "Return value after 5 retries with expected error, match all", retryableErrors: retryOnAllErrors, maxRetries: 10, action: createActionThatReturnsExpectedAfterFiveRetriesOfExpectedErrors()},
+		{description: "Return value after 5 retries with expected error, match exactly", retryableErrors: retryOnExpectedErrorExactMatch, maxRetries: 10, action: createActionThatReturnsExpectedAfterFiveRetriesOfExpectedErrors()},
+		{description: "Return value after 5 retries with expected error, match regex", retryableErrors: retryOnExpectedErrorRegexpMatch, maxRetries: 10, action: createActionThatReturnsExpectedAfterFiveRetriesOfExpectedErrors()},
+		{description: "Return value after 5 retries with expected error, match multiple regex", retryableErrors: retryOnExpectedErrorRegexpMatchWithOthers, maxRetries: 10, action: createActionThatReturnsExpectedAfterFiveRetriesOfExpectedErrors()},
+		{description: "Return value after 5 retries with expected error, match stdout exactly", retryableErrors: retryOnExpectedStdoutExactMatch, maxRetries: 10, action: createActionThatReturnsExpectedAfterFiveRetriesOfUnexpectedErrors()},
+		{description: "Return value after 5 retries with expected error, match stdout with regex", retryableErrors: retryOnExpectedStdoutRegex, maxRetries: 10, action: createActionThatReturnsExpectedAfterFiveRetriesOfUnexpectedErrors()},
+		{description: "Return value after 5 retries with expected error, match exactly, but only do 4 retries", retryableErrors: retryOnExpectedErrorExactMatch, maxRetries: 4, expectedError: retry.MaxRetriesExceeded{Description: "Return value after 5 retries with expected error, match exactly, but only do 4 retries", MaxRetries: 4}, action: createActionThatReturnsExpectedAfterFiveRetriesOfExpectedErrors()},
+		{description: "Return unexpected error after 5 retries with expected error, match exactly", retryableErrors: retryOnExpectedErrorExactMatch, maxRetries: 10, expectedError: retry.FatalError{Underlying: ErrorCounter(6)}, action: createActionThatReturnsErrorCounterAfterFiveRetriesOfExpectedErrors()},
+		{description: "Return unexpected error after 5 retries with expected error, match regex", retryableErrors: retryOnExpectedErrorRegexpMatch, maxRetries: 10, expectedError: retry.FatalError{Underlying: ErrorCounter(6)}, action: createActionThatReturnsErrorCounterAfterFiveRetriesOfExpectedErrors()},
+		{description: "Return unexpected error after 5 retries with expected error, match multiple regex", retryableErrors: retryOnExpectedErrorRegexpMatchWithOthers, maxRetries: 10, expectedError: retry.FatalError{Underlying: ErrorCounter(6)}, action: createActionThatReturnsErrorCounterAfterFiveRetriesOfExpectedErrors()},
+		{description: "Return unexpected error after 5 retries with expected error, match all", retryableErrors: retryOnAllErrors, maxRetries: 10, expectedError: retry.MaxRetriesExceeded{Description: "Return unexpected error after 5 retries with expected error, match all", MaxRetries: 10}, action: createActionThatReturnsErrorCounterAfterFiveRetriesOfExpectedErrors()},
 	}
 
 	for _, testCase := range testCases {
@@ -245,12 +264,13 @@ func TestDoWithRetryableErrors(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			t.Parallel()
 
-			actualOutput, err := DoWithRetryableErrorsE(t, testCase.description, testCase.retryableErrors, testCase.maxRetries, 1*time.Millisecond, testCase.action)
+			actualOutput, err := retry.DoWithRetryableErrorsE(t, testCase.description, testCase.retryableErrors, testCase.maxRetries, 1*time.Millisecond, testCase.action)
 			assert.Equal(t, expectedOutput, actualOutput)
+
 			if testCase.expectedError != nil {
 				assert.Equal(t, testCase.expectedError, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, expectedOutput, actualOutput)
 			}
 		})
@@ -260,5 +280,5 @@ func TestDoWithRetryableErrors(t *testing.T) {
 type ErrorCounter int
 
 func (count ErrorCounter) Error() string {
-	return fmt.Sprintf("%d", int(count))
+	return strconv.Itoa(int(count))
 }
