@@ -3,6 +3,7 @@ package retry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -15,8 +16,8 @@ import (
 
 // Either contains a result and potentially an error.
 type Either struct {
-	Result string
 	Error  error
+	Result string
 }
 
 // DoWithTimeout runs the specified action and waits up to the specified timeout for it to complete. Return the output of the action if
@@ -26,6 +27,7 @@ func DoWithTimeout(t testing.TestingT, actionDescription string, timeout time.Du
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return out
 }
 
@@ -58,6 +60,7 @@ func DoWithRetry(t testing.TestingT, actionDescription string, maxRetries int, s
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return out
 }
 
@@ -65,26 +68,29 @@ func DoWithRetry(t testing.TestingT, actionDescription string, maxRetries int, s
 // immediately. If it returns any other type of error, sleep for sleepBetweenRetries and try again, up to a maximum of
 // maxRetries retries. If maxRetries is exceeded, return a MaxRetriesExceeded error.
 func DoWithRetryE(t testing.TestingT, actionDescription string, maxRetries int, sleepBetweenRetries time.Duration, action func() (string, error)) (string, error) {
-	out, err := DoWithRetryInterfaceE(t, actionDescription, maxRetries, sleepBetweenRetries, func() (interface{}, error) { return action() })
+	out, err := DoWithRetryInterfaceE(t, actionDescription, maxRetries, sleepBetweenRetries, func() (any, error) { return action() })
+
 	return out.(string), err
 }
 
 // DoWithRetryInterface runs the specified action. If it returns a value, return that value. If it returns a FatalError, return that error
 // immediately. If it returns any other type of error, sleep for sleepBetweenRetries and try again, up to a maximum of
 // maxRetries retries. If maxRetries is exceeded, fail the test.
-func DoWithRetryInterface(t testing.TestingT, actionDescription string, maxRetries int, sleepBetweenRetries time.Duration, action func() (interface{}, error)) interface{} {
+func DoWithRetryInterface(t testing.TestingT, actionDescription string, maxRetries int, sleepBetweenRetries time.Duration, action func() (any, error)) any {
 	out, err := DoWithRetryInterfaceE(t, actionDescription, maxRetries, sleepBetweenRetries, action)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return out
 }
 
 // DoWithRetryInterfaceE runs the specified action. If it returns a value, return that value. If it returns a FatalError, return that error
 // immediately. If it returns any other type of error, sleep for sleepBetweenRetries and try again, up to a maximum of
 // maxRetries retries. If maxRetries is exceeded, return a MaxRetriesExceeded error.
-func DoWithRetryInterfaceE(t testing.TestingT, actionDescription string, maxRetries int, sleepBetweenRetries time.Duration, action func() (interface{}, error)) (interface{}, error) {
-	var output interface{}
+func DoWithRetryInterfaceE(t testing.TestingT, actionDescription string, maxRetries int, sleepBetweenRetries time.Duration, action func() (any, error)) (any, error) {
+	var output any
+
 	var err error
 
 	for i := 0; i <= maxRetries; i++ {
@@ -95,8 +101,10 @@ func DoWithRetryInterfaceE(t testing.TestingT, actionDescription string, maxRetr
 			return output, nil
 		}
 
-		if _, isFatalErr := err.(FatalError); isFatalErr {
+		var fatalErr FatalError
+		if errors.As(err, &fatalErr) {
 			logger.Default.Logf(t, "Returning due to fatal error: %v", err)
+
 			return output, err
 		}
 
@@ -115,6 +123,7 @@ func DoWithRetryInterfaceE(t testing.TestingT, actionDescription string, maxRetr
 func DoWithRetryableErrors(t testing.TestingT, actionDescription string, retryableErrors map[string]string, maxRetries int, sleepBetweenRetries time.Duration, action func() (string, error)) string {
 	out, err := DoWithRetryableErrorsE(t, actionDescription, retryableErrors, maxRetries, sleepBetweenRetries, action)
 	require.NoError(t, err)
+
 	return out
 }
 
@@ -125,11 +134,13 @@ func DoWithRetryableErrors(t testing.TestingT, actionDescription string, retryab
 // return that error immediately, wrapped in a FatalError. If maxRetries is exceeded, return a MaxRetriesExceeded error.
 func DoWithRetryableErrorsE(t testing.TestingT, actionDescription string, retryableErrors map[string]string, maxRetries int, sleepBetweenRetries time.Duration, action func() (string, error)) (string, error) {
 	retryableErrorsRegexp := map[*regexp.Regexp]string{}
+
 	for errorStr, errorMessage := range retryableErrors {
 		errorRegex, err := regexp.Compile(errorStr)
 		if err != nil {
 			return "", FatalError{Underlying: err}
 		}
+
 		retryableErrorsRegexp[errorRegex] = errorMessage
 	}
 
