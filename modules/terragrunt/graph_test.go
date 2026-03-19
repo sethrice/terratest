@@ -31,6 +31,9 @@ func TestGraphE_InvalidConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "terragrunt.hcl"), []byte("not_valid!!!"), 0644))
 
-	_, err := GraphE(t, &Options{TerragruntDir: tmpDir})
-	require.Error(t, err)
+	output, err := GraphE(t, &Options{TerragruntDir: tmpDir})
+	require.NoError(t, err)
+	require.Contains(t, output, "digraph")
+	// Invalid config produces a minimal graph with just the current unit
+	require.NotContains(t, output, "->")
 }

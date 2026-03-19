@@ -13,7 +13,7 @@ env: &env
     GO_VERSION: 1.26.0
     GO111MODULE: auto
     K8S_VERSION: v1.28.0  # Same as EKS
-    MINIKUBE_VERSION: v1.32.0
+    MINIKUBE_VERSION: v1.35.0
     HELM_VERSION: v3.13.1
     KUBECONFIG: /home/circleci/.kube/config
     BIN_BUILD_PARALLELISM: 3
@@ -32,6 +32,27 @@ setup_minikube: &setup_minikube
   command: |
     sudo apt update -y
     sudo apt install -y conntrack
+
+    # Install cri-dockerd (required for minikube none driver with K8s v1.24+)
+    CRI_DOCKERD_VERSION="0.3.16"
+    curl -sLO "https://github.com/Mirantis/cri-dockerd/releases/download/v${CRI_DOCKERD_VERSION}/cri-dockerd-${CRI_DOCKERD_VERSION}.amd64.tgz"
+    tar xzf "cri-dockerd-${CRI_DOCKERD_VERSION}.amd64.tgz"
+    sudo install -m 0755 cri-dockerd/cri-dockerd /usr/local/bin/cri-dockerd
+
+    # Set up cri-dockerd systemd service
+    curl -sLo /tmp/cri-docker.service "https://raw.githubusercontent.com/Mirantis/cri-dockerd/v${CRI_DOCKERD_VERSION}/packaging/systemd/cri-docker.service"
+    curl -sLo /tmp/cri-docker.socket "https://raw.githubusercontent.com/Mirantis/cri-dockerd/v${CRI_DOCKERD_VERSION}/packaging/systemd/cri-docker.socket"
+    sudo mv /tmp/cri-docker.service /tmp/cri-docker.socket /etc/systemd/system/
+    sudo sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now cri-docker.socket
+
+    # Install CNI plugins (required for minikube none driver with K8s v1.24+)
+    CNI_PLUGINS_VERSION="v1.6.2"
+    curl -sLO "https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_VERSION}/cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz"
+    sudo mkdir -p /opt/cni/bin
+    sudo tar -C /opt/cni/bin -xzf "cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz"
+
     setup-minikube --k8s-version "$K8S_VERSION" --minikube-version "$MINIKUBE_VERSION"
 
 install_helm: &install_helm

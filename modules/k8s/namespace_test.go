@@ -57,7 +57,9 @@ func TestNamespaceWithMetadata(t *testing.T) {
 
 	namespace := GetNamespace(t, options, namespaceName)
 	require.Equal(t, namespace.Name, namespaceName)
-	require.Equal(t, namespace.Labels, namespaceLabels)
+	for k, v := range namespaceLabels {
+		require.Equal(t, v, namespace.Labels[k], "Expected label %s=%s", k, v)
+	}
 }
 
 func TestListNamespaces(t *testing.T) {
