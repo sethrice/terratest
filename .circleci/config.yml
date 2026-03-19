@@ -47,6 +47,12 @@ setup_minikube: &setup_minikube
     sudo systemctl daemon-reload
     sudo systemctl enable --now cri-docker.socket
 
+    # Install CNI plugins (required for minikube none driver with K8s v1.24+)
+    CNI_PLUGINS_VERSION="v1.6.2"
+    curl -sLO "https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_VERSION}/cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz"
+    sudo mkdir -p /opt/cni/bin
+    sudo tar -C /opt/cni/bin -xzf "cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz"
+
     setup-minikube --k8s-version "$K8S_VERSION" --minikube-version "$MINIKUBE_VERSION"
 
 install_helm: &install_helm
