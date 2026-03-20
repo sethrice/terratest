@@ -2,7 +2,6 @@ package shell_test
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -26,7 +25,7 @@ func TestRunCommandAndGetOutput(t *testing.T) {
 		Args:    []string{text},
 	}
 
-	out := shell.RunCommandContextAndGetOutput(t, context.Background(), cmd)
+	out := shell.RunCommandContextAndGetOutput(t, t.Context(), cmd)
 	assert.Equal(t, text, strings.TrimSpace(out))
 }
 
@@ -62,7 +61,7 @@ echo_stderr
 		Args:    []string{"-c", bashCode},
 	}
 
-	out := shell.RunCommandContextAndGetOutput(t, context.Background(), cmd)
+	out := shell.RunCommandContextAndGetOutput(t, t.Context(), cmd)
 	assert.Equal(t, expectedText, strings.TrimSpace(out))
 }
 
@@ -75,7 +74,7 @@ func TestRunCommandGetExitCode(t *testing.T) {
 		Logger:  logger.Discard,
 	}
 
-	out, err := shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
+	out, err := shell.RunCommandContextAndGetOutputE(t, t.Context(), cmd)
 	assert.Empty(t, out)
 	require.Error(t, err)
 
@@ -115,7 +114,7 @@ wait
 		Logger:  logger.Discard,
 	}
 
-	out := shell.RunCommandContextAndGetOutput(t, context.Background(), cmd)
+	out := shell.RunCommandContextAndGetOutput(t, t.Context(), cmd)
 
 	stdoutReg := regexp.MustCompile(uniqueStdout)
 	stderrReg := regexp.MustCompile(uniqueStderr)
@@ -142,7 +141,7 @@ echo
 		Logger:  logger.Discard, // don't print that line to stdout
 	}
 
-	out, err := shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
+	out, err := shell.RunCommandContextAndGetOutputE(t, t.Context(), cmd)
 	require.NoError(t, err)
 
 	var buffer bytes.Buffer
@@ -164,7 +163,7 @@ func TestRunCommandOutputError(t *testing.T) {
 		Logger:  logger.Discard,
 	}
 
-	out, err := shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
+	out, err := shell.RunCommandContextAndGetOutputE(t, t.Context(), cmd)
 	assert.Empty(t, out)
 	assert.Error(t, err)
 }
@@ -175,7 +174,7 @@ func TestCommandOutputType(t *testing.T) {
 	stdout := "hello world"
 	stderr := "this command has failed"
 
-	_, err := shell.RunCommandContextAndGetOutputE(t, context.Background(), &shell.Command{
+	_, err := shell.RunCommandContextAndGetOutputE(t, t.Context(), &shell.Command{
 		Command: "sh",
 		Args:    []string{"-c", `echo "` + stdout + `" && echo "` + stderr + `" >&2 && exit 1`},
 		Logger:  logger.Discard,
@@ -206,7 +205,7 @@ func TestCommandWithStdoutAndStdErr(t *testing.T) {
 	t.Run("MustNotError", func(t *testing.T) {
 		t.Parallel()
 
-		ostdout, ostderr := shell.RunCommandContextAndGetStdOutErr(t, context.Background(), command)
+		ostdout, ostderr := shell.RunCommandContextAndGetStdOutErr(t, t.Context(), command)
 		assert.Equal(t, stdout, ostdout)
 		assert.Equal(t, stderr, ostderr)
 	})
@@ -214,7 +213,7 @@ func TestCommandWithStdoutAndStdErr(t *testing.T) {
 	t.Run("ReturnError", func(t *testing.T) {
 		t.Parallel()
 
-		ostdout, ostderr, err := shell.RunCommandContextAndGetStdOutErrE(t, context.Background(), command)
+		ostdout, ostderr, err := shell.RunCommandContextAndGetStdOutErrE(t, t.Context(), command)
 		require.NoError(t, err)
 		assert.Equal(t, stdout, ostdout)
 		assert.Equal(t, stderr, ostderr)
@@ -230,6 +229,6 @@ func TestRunCommandWithStdinAndGetOutput(t *testing.T) {
 		Stdin:   strings.NewReader(text),
 	}
 
-	out := shell.RunCommandContextAndGetOutput(t, context.Background(), cmd)
+	out := shell.RunCommandContextAndGetOutput(t, t.Context(), cmd)
 	assert.Equal(t, text, strings.TrimSpace(out))
 }
