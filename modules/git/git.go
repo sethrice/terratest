@@ -11,17 +11,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// GetCurrentBranchName retrieves the current branch name or
-// empty string in case of detached state.
+// GetCurrentBranchName retrieves the current branch name or an empty string
+// in case of detached state. Fails the test if an error occurs.
 //
-// Deprecated: Use GetCurrentBranchNameContext instead.
+// Deprecated: Use [GetCurrentBranchNameContext] instead, which supports context
+// cancellation and accepts an explicit working directory rather than relying on
+// the process working directory.
 func GetCurrentBranchName(t testing.TestingT) string {
-	return GetCurrentBranchNameContext(t, context.Background())
+	return GetCurrentBranchNameContext(t, context.Background(), "")
 }
 
-// GetCurrentBranchNameContext is like GetCurrentBranchName but includes a context.
-func GetCurrentBranchNameContext(t testing.TestingT, ctx context.Context) string {
-	out, err := GetCurrentBranchNameContextE(t, ctx)
+// GetCurrentBranchNameContext retrieves the current branch name or an empty
+// string in case of detached state. The dir parameter specifies the working
+// directory for the git command; if empty, the process working directory is
+// used. Fails the test if an error occurs.
+func GetCurrentBranchNameContext(t testing.TestingT, ctx context.Context, dir string) string {
+	out, err := GetCurrentBranchNameContextE(t, ctx, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,23 +34,29 @@ func GetCurrentBranchNameContext(t testing.TestingT, ctx context.Context) string
 	return out
 }
 
-// GetCurrentBranchNameE retrieves the current branch name or
-// empty string in case of detached state.
-// Uses branch --show-current, which was introduced in git v2.22.
-// Falls back to rev-parse for users of the older version, like Ubuntu 18.04.
+// GetCurrentBranchNameE retrieves the current branch name or an empty string
+// in case of detached state. Uses git branch --show-current, which was
+// introduced in git v2.22. Falls back to git rev-parse for older versions.
 //
-// Deprecated: Use GetCurrentBranchNameContextE instead.
+// Deprecated: Use [GetCurrentBranchNameContextE] instead, which supports
+// context cancellation and accepts an explicit working directory rather than
+// relying on the process working directory.
 func GetCurrentBranchNameE(t testing.TestingT) (string, error) {
-	return GetCurrentBranchNameContextE(t, context.Background())
+	return GetCurrentBranchNameContextE(t, context.Background(), "")
 }
 
-// GetCurrentBranchNameContextE is like GetCurrentBranchNameE but includes a context.
-func GetCurrentBranchNameContextE(t testing.TestingT, ctx context.Context) (string, error) {
+// GetCurrentBranchNameContextE retrieves the current branch name or an empty
+// string in case of detached state. Uses git branch --show-current, which was
+// introduced in git v2.22. Falls back to git rev-parse for older versions.
+// The dir parameter specifies the working directory for the git command; if
+// empty, the process working directory is used.
+func GetCurrentBranchNameContextE(t testing.TestingT, ctx context.Context, dir string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", "branch", "--show-current")
+	cmd.Dir = dir
 
 	bytes, err := cmd.Output()
 	if err != nil {
-		return GetCurrentBranchNameOldContextE(t, ctx)
+		return GetCurrentBranchNameOldContextE(t, ctx, dir)
 	}
 
 	name := strings.TrimSpace(string(bytes))
@@ -56,18 +67,24 @@ func GetCurrentBranchNameContextE(t testing.TestingT, ctx context.Context) (stri
 	return name, nil
 }
 
-// GetCurrentBranchNameOldE retrieves the current branch name or
-// empty string in case of detached state. This uses the older pattern
-// of `git rev-parse` rather than `git branch --show-current`.
+// GetCurrentBranchNameOldE retrieves the current branch name or an empty
+// string in case of detached state using git rev-parse --abbrev-ref HEAD.
 //
-// Deprecated: Use GetCurrentBranchNameOldContextE instead.
+// Deprecated: Use [GetCurrentBranchNameOldContextE] instead, which supports
+// context cancellation and accepts an explicit working directory rather than
+// relying on the process working directory.
 func GetCurrentBranchNameOldE(t testing.TestingT) (string, error) {
-	return GetCurrentBranchNameOldContextE(t, context.Background())
+	return GetCurrentBranchNameOldContextE(t, context.Background(), "")
 }
 
-// GetCurrentBranchNameOldContextE is like GetCurrentBranchNameOldE but includes a context.
-func GetCurrentBranchNameOldContextE(t testing.TestingT, ctx context.Context) (string, error) {
+// GetCurrentBranchNameOldContextE retrieves the current branch name or an
+// empty string in case of detached state using git rev-parse --abbrev-ref HEAD.
+// This is a fallback for git versions older than v2.22 that lack
+// git branch --show-current. The dir parameter specifies the working directory
+// for the git command; if empty, the process working directory is used.
+func GetCurrentBranchNameOldContextE(t testing.TestingT, ctx context.Context, dir string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = dir
 
 	bytes, err := cmd.Output()
 	if err != nil {
@@ -82,17 +99,24 @@ func GetCurrentBranchNameOldContextE(t testing.TestingT, ctx context.Context) (s
 	return name, nil
 }
 
-// GetCurrentGitRef retrieves current branch name, lightweight (non-annotated) tag or
-// if tag points to the commit exact tag value.
+// GetCurrentGitRef retrieves the current branch name, lightweight
+// (non-annotated) tag, or exact tag value if the tag points to the current
+// commit. Fails the test if an error occurs.
 //
-// Deprecated: Use GetCurrentGitRefContext instead.
+// Deprecated: Use [GetCurrentGitRefContext] instead, which supports context
+// cancellation and accepts an explicit working directory rather than relying on
+// the process working directory.
 func GetCurrentGitRef(t testing.TestingT) string {
-	return GetCurrentGitRefContext(t, context.Background())
+	return GetCurrentGitRefContext(t, context.Background(), "")
 }
 
-// GetCurrentGitRefContext is like GetCurrentGitRef but includes a context.
-func GetCurrentGitRefContext(t testing.TestingT, ctx context.Context) string {
-	out, err := GetCurrentGitRefContextE(t, ctx)
+// GetCurrentGitRefContext retrieves the current branch name, lightweight
+// (non-annotated) tag, or exact tag value if the tag points to the current
+// commit. The dir parameter specifies the working directory for the git
+// command; if empty, the process working directory is used. Fails the test if
+// an error occurs.
+func GetCurrentGitRefContext(t testing.TestingT, ctx context.Context, dir string) string {
+	out, err := GetCurrentGitRefContextE(t, ctx, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,17 +124,23 @@ func GetCurrentGitRefContext(t testing.TestingT, ctx context.Context) string {
 	return out
 }
 
-// GetCurrentGitRefE retrieves current branch name, lightweight (non-annotated) tag or
-// if tag points to the commit exact tag value.
+// GetCurrentGitRefE retrieves the current branch name, lightweight
+// (non-annotated) tag, or exact tag value if the tag points to the current
+// commit.
 //
-// Deprecated: Use GetCurrentGitRefContextE instead.
+// Deprecated: Use [GetCurrentGitRefContextE] instead, which supports context
+// cancellation and accepts an explicit working directory rather than relying on
+// the process working directory.
 func GetCurrentGitRefE(t testing.TestingT) (string, error) {
-	return GetCurrentGitRefContextE(t, context.Background())
+	return GetCurrentGitRefContextE(t, context.Background(), "")
 }
 
-// GetCurrentGitRefContextE is like GetCurrentGitRefE but includes a context.
-func GetCurrentGitRefContextE(t testing.TestingT, ctx context.Context) (string, error) {
-	out, err := GetCurrentBranchNameContextE(t, ctx)
+// GetCurrentGitRefContextE retrieves the current branch name, lightweight
+// (non-annotated) tag, or exact tag value if the tag points to the current
+// commit. The dir parameter specifies the working directory for the git
+// command; if empty, the process working directory is used.
+func GetCurrentGitRefContextE(t testing.TestingT, ctx context.Context, dir string) (string, error) {
+	out, err := GetCurrentBranchNameContextE(t, ctx, dir)
 	if err != nil {
 		return "", err
 	}
@@ -119,7 +149,7 @@ func GetCurrentGitRefContextE(t testing.TestingT, ctx context.Context) (string, 
 		return out, nil
 	}
 
-	out, err = GetTagContextE(t, ctx)
+	out, err = GetTagContextE(t, ctx, dir)
 	if err != nil {
 		return "", err
 	}
@@ -127,17 +157,23 @@ func GetCurrentGitRefContextE(t testing.TestingT, ctx context.Context) (string, 
 	return out, nil
 }
 
-// GetTagE retrieves lightweight (non-annotated) tag or if tag points
-// to the commit exact tag value.
+// GetTagE retrieves the lightweight (non-annotated) tag or exact tag value if
+// the tag points to the current commit.
 //
-// Deprecated: Use GetTagContextE instead.
+// Deprecated: Use [GetTagContextE] instead, which supports context
+// cancellation and accepts an explicit working directory rather than relying on
+// the process working directory.
 func GetTagE(t testing.TestingT) (string, error) {
-	return GetTagContextE(t, context.Background())
+	return GetTagContextE(t, context.Background(), "")
 }
 
-// GetTagContextE is like GetTagE but includes a context.
-func GetTagContextE(t testing.TestingT, ctx context.Context) (string, error) {
+// GetTagContextE retrieves the lightweight (non-annotated) tag or exact tag
+// value if the tag points to the current commit. The dir parameter specifies
+// the working directory for the git command; if empty, the process working
+// directory is used.
+func GetTagContextE(t testing.TestingT, ctx context.Context, dir string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", "describe", "--tags")
+	cmd.Dir = dir
 
 	bytes, err := cmd.Output()
 	if err != nil {
@@ -147,16 +183,21 @@ func GetTagContextE(t testing.TestingT, ctx context.Context) (string, error) {
 	return strings.TrimSpace(string(bytes)), nil
 }
 
-// GetRepoRoot retrieves the path to the root directory of the repo. This fails the test if there is an error.
+// GetRepoRoot retrieves the path to the root directory of the repo. Fails the
+// test if there is an error.
 //
-// Deprecated: Use GetRepoRootContext instead.
+// Deprecated: Use [GetRepoRootContext] instead, which supports context
+// cancellation and accepts an explicit working directory rather than relying on
+// the process working directory.
 func GetRepoRoot(t testing.TestingT) string {
-	return GetRepoRootContext(t, context.Background())
+	return GetRepoRootContext(t, context.Background(), "")
 }
 
-// GetRepoRootContext is like GetRepoRoot but includes a context.
-func GetRepoRootContext(t testing.TestingT, ctx context.Context) string {
-	out, err := GetRepoRootContextE(t, ctx)
+// GetRepoRootContext retrieves the path to the root directory of the repo. The
+// dir parameter specifies the working directory for the git command; if empty,
+// the process working directory is used. Fails the test if there is an error.
+func GetRepoRootContext(t testing.TestingT, ctx context.Context, dir string) string {
+	out, err := GetRepoRootContextE(t, ctx, dir)
 	require.NoError(t, err)
 
 	return out
@@ -164,29 +205,40 @@ func GetRepoRootContext(t testing.TestingT, ctx context.Context) string {
 
 // GetRepoRootE retrieves the path to the root directory of the repo.
 //
-// Deprecated: Use GetRepoRootContextE instead.
+// Deprecated: Use [GetRepoRootContextE] instead, which supports context
+// cancellation and accepts an explicit working directory rather than relying on
+// the process working directory.
 func GetRepoRootE(t testing.TestingT) (string, error) {
-	return GetRepoRootContextE(t, context.Background())
+	return GetRepoRootContextE(t, context.Background(), "")
 }
 
-// GetRepoRootContextE is like GetRepoRootE but includes a context.
-func GetRepoRootContextE(t testing.TestingT, ctx context.Context) (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
+// GetRepoRootContextE retrieves the path to the root directory of the repo.
+// The dir parameter specifies the working directory for the git command; if
+// empty, the process working directory is used.
+func GetRepoRootContextE(t testing.TestingT, ctx context.Context, dir string) (string, error) {
+	if dir == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+
+		dir = cwd
 	}
 
 	return GetRepoRootForDirContextE(t, ctx, dir)
 }
 
-// GetRepoRootForDir retrieves the path to the root directory of the repo in which dir resides
+// GetRepoRootForDir retrieves the path to the root directory of the repo in
+// which dir resides. Fails the test if there is an error.
 //
-// Deprecated: Use GetRepoRootForDirContext instead.
+// Deprecated: Use [GetRepoRootForDirContext] instead, which supports context
+// cancellation.
 func GetRepoRootForDir(t testing.TestingT, dir string) string {
 	return GetRepoRootForDirContext(t, context.Background(), dir)
 }
 
-// GetRepoRootForDirContext is like GetRepoRootForDir but includes a context.
+// GetRepoRootForDirContext retrieves the path to the root directory of the
+// repo in which dir resides. Fails the test if there is an error.
 func GetRepoRootForDirContext(t testing.TestingT, ctx context.Context, dir string) string {
 	out, err := GetRepoRootForDirContextE(t, ctx, dir)
 	require.NoError(t, err)
@@ -194,14 +246,17 @@ func GetRepoRootForDirContext(t testing.TestingT, ctx context.Context, dir strin
 	return out
 }
 
-// GetRepoRootForDirE retrieves the path to the root directory of the repo in which dir resides
+// GetRepoRootForDirE retrieves the path to the root directory of the repo in
+// which dir resides.
 //
-// Deprecated: Use GetRepoRootForDirContextE instead.
+// Deprecated: Use [GetRepoRootForDirContextE] instead, which supports context
+// cancellation.
 func GetRepoRootForDirE(t testing.TestingT, dir string) (string, error) {
 	return GetRepoRootForDirContextE(t, context.Background(), dir)
 }
 
-// GetRepoRootForDirContextE is like GetRepoRootForDirE but includes a context.
+// GetRepoRootForDirContextE retrieves the path to the root directory of the
+// repo in which dir resides.
 func GetRepoRootForDirContextE(t testing.TestingT, ctx context.Context, dir string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--show-toplevel")
 	cmd.Dir = dir

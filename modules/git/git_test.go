@@ -22,49 +22,47 @@ func TestGitRefChecks(t *testing.T) {
 	err := exec.CommandContext(t.Context(), "git", "clone", url, gitWorkDir).Run()
 	require.NoError(t, err)
 
-	t.Chdir(gitWorkDir)
-
 	t.Run("GetCurrentBranchNameReturnsBranchName", func(t *testing.T) {
-		err := exec.CommandContext(t.Context(), "git", "checkout", "main").Run()
+		err := exec.CommandContext(t.Context(), "git", "-C", gitWorkDir, "checkout", "main").Run()
 		require.NoError(t, err)
 
-		name := git.GetCurrentBranchNameContext(t, t.Context())
+		name := git.GetCurrentBranchNameContext(t, t.Context(), gitWorkDir)
 
 		assert.Equal(t, "main", name)
 	})
 
 	t.Run("GetCurrentBranchNameReturnsEmptyForDetachedState", func(t *testing.T) {
-		err := exec.CommandContext(t.Context(), "git", "checkout", "v0.0.1").Run()
+		err := exec.CommandContext(t.Context(), "git", "-C", gitWorkDir, "checkout", "v0.0.1").Run()
 		require.NoError(t, err)
 
-		name := git.GetCurrentBranchNameContext(t, t.Context())
+		name := git.GetCurrentBranchNameContext(t, t.Context(), gitWorkDir)
 
 		assert.Empty(t, name)
 	})
 
 	t.Run("GetCurrentRefReturnsBranchName", func(t *testing.T) {
-		err := exec.CommandContext(t.Context(), "git", "checkout", "main").Run()
+		err := exec.CommandContext(t.Context(), "git", "-C", gitWorkDir, "checkout", "main").Run()
 		require.NoError(t, err)
 
-		name := git.GetCurrentGitRefContext(t, t.Context())
+		name := git.GetCurrentGitRefContext(t, t.Context(), gitWorkDir)
 
 		assert.Equal(t, "main", name)
 	})
 
 	t.Run("GetCurrentRefReturnsTagValue", func(t *testing.T) {
-		err := exec.CommandContext(t.Context(), "git", "checkout", "v0.0.1").Run()
+		err := exec.CommandContext(t.Context(), "git", "-C", gitWorkDir, "checkout", "v0.0.1").Run()
 		require.NoError(t, err)
 
-		name := git.GetCurrentGitRefContext(t, t.Context())
+		name := git.GetCurrentGitRefContext(t, t.Context(), gitWorkDir)
 
 		assert.Equal(t, "v0.0.1", name)
 	})
 
 	t.Run("GetCurrentRefReturnsLightTagValue", func(t *testing.T) {
-		err := exec.CommandContext(t.Context(), "git", "checkout", "58d3ea8").Run()
+		err := exec.CommandContext(t.Context(), "git", "-C", gitWorkDir, "checkout", "58d3ea8").Run()
 		require.NoError(t, err)
 
-		name := git.GetCurrentGitRefContext(t, t.Context())
+		name := git.GetCurrentGitRefContext(t, t.Context(), gitWorkDir)
 
 		assert.Equal(t, "v0.0.1-1-g58d3ea8f", name)
 	})
@@ -79,6 +77,6 @@ func TestGetRepoRoot(t *testing.T) {
 	expectedRepoRoot, err := filepath.Abs(filepath.Join(cwd, "..", ".."))
 	require.NoError(t, err)
 
-	repoRoot := git.GetRepoRootContext(t, t.Context())
+	repoRoot := git.GetRepoRootContext(t, t.Context(), cwd)
 	assert.Equal(t, expectedRepoRoot, repoRoot)
 }
