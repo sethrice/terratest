@@ -54,7 +54,23 @@ setup_minikube: &setup_minikube
     sudo mkdir -p /opt/cni/bin
     sudo tar -C /opt/cni/bin -xzf "cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz"
 
-    setup-minikube --k8s-version "$K8S_VERSION" --minikube-version "$MINIKUBE_VERSION"
+    # Retry setup-minikube to reduce flakes from transient GPG key retrieval timeouts
+    for i in 1 2 3; do
+      echo "Attempt $i: setting up minikube..."
+
+      if setup-minikube --k8s-version "$K8S_VERSION" --minikube-version "$MINIKUBE_VERSION"; then
+        break
+      fi
+
+      echo "setup-minikube failed on attempt $i"
+
+      if [ "$i" -eq 3 ]; then
+        echo "setup-minikube failed after 3 attempts"
+        exit 1
+      fi
+
+      sleep 10
+    done
 
 install_helm: &install_helm
   name: install helm
