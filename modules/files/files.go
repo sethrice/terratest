@@ -2,6 +2,8 @@
 package files
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +23,7 @@ func FileExists(path string) bool {
 // It will return an error if os.Stat error is not an ErrNotExist
 func FileExistsE(path string) (bool, error) {
 	_, err := os.Stat(path)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return false, err
 	}
 
@@ -179,7 +181,7 @@ func CopyFolderContentsWithFilter(source string, destination string, filter func
 				return err
 			}
 		case isSymLink(f):
-			if err := copySymLink(src, dest); err != nil {
+			if err := copySymlink(src, dest); err != nil {
 				return err
 			}
 		default:
@@ -206,8 +208,7 @@ func PathContainsTerraformState(path string) bool {
 
 // PathContainsHiddenFileOrFolder returns true if the given path contains a hidden file or folder.
 func PathContainsHiddenFileOrFolder(path string) bool {
-	pathParts := strings.Split(path, string(filepath.Separator))
-	for _, pathPart := range pathParts {
+	for pathPart := range strings.SplitSeq(path, string(filepath.Separator)) {
 		if strings.HasPrefix(pathPart, ".") && pathPart != "." && pathPart != ".." {
 			return true
 		}
@@ -252,19 +253,14 @@ func isSymLink(file os.FileInfo) bool {
 	return file.Mode()&os.ModeSymlink != 0
 }
 
-// copySymLink copies the source symbolic link to the given destination.
-func copySymLink(source string, destination string) error {
+// copySymlink copies the source symbolic link to the given destination.
+func copySymlink(source string, destination string) error {
 	symlinkPath, err := os.Readlink(source)
 	if err != nil {
 		return err
 	}
 
-	err = os.Symlink(symlinkPath, destination)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return os.Symlink(symlinkPath, destination)
 }
 
 // FindTerraformSourceFilesInDir given a directory path, finds all the terraform source files contained in it. This will
