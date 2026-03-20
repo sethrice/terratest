@@ -2,7 +2,6 @@ package oci
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/random"
@@ -87,7 +86,7 @@ func GetAllVcnIDsE(t testing.TestingT, compartmentID string) ([]string, error) {
 	}
 
 	if len(response.Items) == 0 {
-		return nil, fmt.Errorf("no VCNs found in the %s compartment", compartmentID)
+		return nil, NoVCNsFoundError{CompartmentID: compartmentID}
 	}
 
 	return vcnsIDs(response.Items), nil

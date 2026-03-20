@@ -2,7 +2,6 @@ package oci
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/gruntwork-io/terratest/modules/logger"
@@ -71,7 +70,7 @@ func GetAllAvailabilityDomainsE(t testing.TestingT, compartmentID string) ([]str
 	}
 
 	if len(response.Items) == 0 {
-		return nil, fmt.Errorf("no availability domains found in the %s compartment", compartmentID)
+		return nil, NoAvailabilityDomainsFoundError{CompartmentID: compartmentID}
 	}
 
 	return availabilityDomainsNames(response.Items), nil

@@ -3,7 +3,6 @@ package oci
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	"github.com/gruntwork-io/terratest/modules/logger"
@@ -68,7 +67,7 @@ func GetMostRecentImageIDE(t testing.TestingT, compartmentID string, osName stri
 	}
 
 	if len(response.Items) == 0 {
-		return "", fmt.Errorf("no %s %s images found in the %s compartment", osName, osVersion, compartmentID)
+		return "", NoImagesFoundError{OSName: osName, OSVersion: osVersion, CompartmentID: compartmentID}
 	}
 
 	mostRecentImage := mostRecentImage(response.Items)
