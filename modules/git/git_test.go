@@ -1,4 +1,4 @@
-package git
+package git_test
 
 import (
 	"os"
@@ -6,55 +6,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/git"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func testGetCurrentBranchNameReturnsBranchName(t *testing.T) {
-	err := exec.Command("git", "checkout", "main").Run()
-	require.NoError(t, err)
-
-	name := GetCurrentBranchName(t)
-
-	assert.Equal(t, "main", name)
-}
-
-func testGetCurrentBranchNameReturnsEmptyForDetachedState(t *testing.T) {
-	err := exec.Command("git", "checkout", "v0.0.1").Run()
-	assert.Nil(t, err)
-
-	name := GetCurrentBranchName(t)
-
-	assert.Empty(t, name)
-}
-
-func testGetCurrentRefReturnsBranchName(t *testing.T) {
-	err := exec.Command("git", "checkout", "main").Run()
-	require.NoError(t, err)
-
-	name := GetCurrentGitRef(t)
-
-	assert.Equal(t, "main", name)
-}
-
-func testGetCurrentRefReturnsTagValue(t *testing.T) {
-	err := exec.Command("git", "checkout", "v0.0.1").Run()
-	require.NoError(t, err)
-
-	name := GetCurrentGitRef(t)
-
-	assert.Equal(t, "v0.0.1", name)
-}
-
-func testGetCurrentRefReturnsLightTagValue(t *testing.T) {
-	err := exec.Command("git", "checkout", "58d3ea8").Run()
-	require.NoError(t, err)
-
-	name := GetCurrentGitRef(t)
-
-	assert.Equal(t, "v0.0.1-1-g58d3ea8f", name)
-}
-
+//nolint:paralleltest,tparallel // subtests mutate shared git state (checkout) and must run sequentially
 func TestGitRefChecks(t *testing.T) {
 	t.Parallel()
 
@@ -62,17 +19,55 @@ func TestGitRefChecks(t *testing.T) {
 	gitWorkDir := filepath.Join(tmpdir, "terratest")
 
 	url := "https://github.com/gruntwork-io/terratest.git"
-	err := exec.Command("git", "clone", url, gitWorkDir).Run()
+	err := exec.CommandContext(t.Context(), "git", "clone", url, gitWorkDir).Run()
 	require.NoError(t, err)
 
-	err = os.Chdir(gitWorkDir)
-	require.NoError(t, err)
+	t.Chdir(gitWorkDir)
 
-	t.Run("GetCurrentBranchNameReturnsBranchName", testGetCurrentBranchNameReturnsBranchName)
-	t.Run("GetCurrentBranchNameReturnsEmptyForDetachedState", testGetCurrentBranchNameReturnsEmptyForDetachedState)
-	t.Run("GetCurrentRefReturnsBranchName", testGetCurrentRefReturnsBranchName)
-	t.Run("GetCurrentRefReturnsTagValue", testGetCurrentRefReturnsTagValue)
-	t.Run("GetCurrentRefReturnsLightTagValue", testGetCurrentRefReturnsLightTagValue)
+	t.Run("GetCurrentBranchNameReturnsBranchName", func(t *testing.T) {
+		err := exec.CommandContext(t.Context(), "git", "checkout", "main").Run()
+		require.NoError(t, err)
+
+		name := git.GetCurrentBranchNameContext(t, t.Context())
+
+		assert.Equal(t, "main", name)
+	})
+
+	t.Run("GetCurrentBranchNameReturnsEmptyForDetachedState", func(t *testing.T) {
+		err := exec.CommandContext(t.Context(), "git", "checkout", "v0.0.1").Run()
+		require.NoError(t, err)
+
+		name := git.GetCurrentBranchNameContext(t, t.Context())
+
+		assert.Empty(t, name)
+	})
+
+	t.Run("GetCurrentRefReturnsBranchName", func(t *testing.T) {
+		err := exec.CommandContext(t.Context(), "git", "checkout", "main").Run()
+		require.NoError(t, err)
+
+		name := git.GetCurrentGitRefContext(t, t.Context())
+
+		assert.Equal(t, "main", name)
+	})
+
+	t.Run("GetCurrentRefReturnsTagValue", func(t *testing.T) {
+		err := exec.CommandContext(t.Context(), "git", "checkout", "v0.0.1").Run()
+		require.NoError(t, err)
+
+		name := git.GetCurrentGitRefContext(t, t.Context())
+
+		assert.Equal(t, "v0.0.1", name)
+	})
+
+	t.Run("GetCurrentRefReturnsLightTagValue", func(t *testing.T) {
+		err := exec.CommandContext(t.Context(), "git", "checkout", "58d3ea8").Run()
+		require.NoError(t, err)
+
+		name := git.GetCurrentGitRefContext(t, t.Context())
+
+		assert.Equal(t, "v0.0.1-1-g58d3ea8f", name)
+	})
 }
 
 func TestGetRepoRoot(t *testing.T) {
@@ -80,9 +75,10 @@ func TestGetRepoRoot(t *testing.T) {
 
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
+
 	expectedRepoRoot, err := filepath.Abs(filepath.Join(cwd, "..", ".."))
 	require.NoError(t, err)
 
-	repoRoot := GetRepoRoot(t)
+	repoRoot := git.GetRepoRootContext(t, t.Context())
 	assert.Equal(t, expectedRepoRoot, repoRoot)
 }
