@@ -1,4 +1,4 @@
-package files
+package files_test
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/files"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,8 +20,8 @@ func TestFileExists(t *testing.T) {
 	currentFile, err := filepath.Abs(os.Args[0])
 	require.NoError(t, err)
 
-	assert.True(t, FileExists(currentFile))
-	assert.False(t, FileExists("/not/a/real/path"))
+	assert.True(t, files.FileExists(currentFile))
+	assert.False(t, files.FileExists("/not/a/real/path"))
 }
 
 func TestIsExistingFile(t *testing.T) {
@@ -28,11 +29,12 @@ func TestIsExistingFile(t *testing.T) {
 
 	currentFile, err := filepath.Abs(os.Args[0])
 	require.NoError(t, err)
+
 	currentFileDir := filepath.Dir(currentFile)
 
-	assert.True(t, IsExistingFile(currentFile))
-	assert.False(t, IsExistingFile("/not/a/real/path"))
-	assert.False(t, IsExistingFile(currentFileDir))
+	assert.True(t, files.IsExistingFile(currentFile))
+	assert.False(t, files.IsExistingFile("/not/a/real/path"))
+	assert.False(t, files.IsExistingFile(currentFileDir))
 }
 
 func TestIsExistingDir(t *testing.T) {
@@ -40,11 +42,12 @@ func TestIsExistingDir(t *testing.T) {
 
 	currentFile, err := filepath.Abs(os.Args[0])
 	require.NoError(t, err)
+
 	currentFileDir := filepath.Dir(currentFile)
 
-	assert.False(t, IsExistingDir(currentFile))
-	assert.False(t, IsExistingDir("/not/a/real/path"))
-	assert.True(t, IsExistingDir(currentFileDir))
+	assert.False(t, files.IsExistingDir(currentFile))
+	assert.False(t, files.IsExistingDir("/not/a/real/path"))
+	assert.True(t, files.IsExistingDir(currentFileDir))
 }
 
 func TestCopyFolderToDest(t *testing.T) {
@@ -55,14 +58,14 @@ func TestCopyFolderToDest(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	filter := func(path string) bool {
-		return !PathContainsHiddenFileOrFolder(path) && !PathContainsTerraformState(path)
+		return !files.PathContainsHiddenFileOrFolder(path) && !files.PathContainsTerraformState(path)
 	}
 
-	folder, err := CopyFolderToDest("/not/a/real/path", destFolder, tempFolderPrefix, filter)
+	folder, err := files.CopyFolderToDest("/not/a/real/path", destFolder, tempFolderPrefix, filter)
 	require.Error(t, err)
-	assert.False(t, FileExists(folder))
+	assert.False(t, files.FileExists(folder))
 
-	folder, err = CopyFolderToDest(tmpDir, destFolder, tempFolderPrefix, filter)
+	folder, err = files.CopyFolderToDest(tmpDir, destFolder, tempFolderPrefix, filter)
 	assert.DirExists(t, folder)
 	assert.NoError(t, err)
 }
@@ -74,7 +77,7 @@ func TestCopyFolderContents(t *testing.T) {
 	expectedDir := filepath.Join(copyFolderContentsFixtureRoot, "full-copy")
 	tmpDir := t.TempDir()
 
-	err := CopyFolderContents(originalDir, tmpDir)
+	err := files.CopyFolderContents(originalDir, tmpDir)
 	require.NoError(t, err)
 
 	requireDirectoriesEqual(t, expectedDir, tmpDir)
@@ -87,8 +90,8 @@ func TestCopyFolderContentsWithHiddenFilesFilter(t *testing.T) {
 	expectedDir := filepath.Join(copyFolderContentsFixtureRoot, "no-hidden-files")
 	tmpDir := t.TempDir()
 
-	err := CopyFolderContentsWithFilter(originalDir, tmpDir, func(path string) bool {
-		return !PathContainsHiddenFileOrFolder(path)
+	err := files.CopyFolderContentsWithFilter(originalDir, tmpDir, func(path string) bool {
+		return !files.PathContainsHiddenFileOrFolder(path)
 	})
 	require.NoError(t, err)
 
@@ -103,8 +106,8 @@ func TestCopyFolderContentsWithSymLinks(t *testing.T) {
 	expectedDir := filepath.Join(copyFolderContentsFixtureRoot, "symlinks")
 	tmpDir := t.TempDir()
 
-	err := CopyFolderContentsWithFilter(originalDir, tmpDir, func(path string) bool {
-		return !PathContainsHiddenFileOrFolder(path)
+	err := files.CopyFolderContentsWithFilter(originalDir, tmpDir, func(path string) bool {
+		return !files.PathContainsHiddenFileOrFolder(path)
 	})
 	require.NoError(t, err)
 
@@ -118,21 +121,23 @@ func TestCopyFolderContentsWithBrokenSymLinks(t *testing.T) {
 	// Creating broken symlink
 	pathToFile := filepath.Join(copyFolderContentsFixtureRoot, "symlinks-broken/nonexistent-folder/bar.txt")
 	pathToSymlink := filepath.Join(copyFolderContentsFixtureRoot, "symlinks-broken/bar.txt")
+
 	defer func() {
 		if err := os.Remove(pathToSymlink); err != nil {
-			t.Fatal(fmt.Errorf("Failed to remove link: %+v", err))
+			t.Fatal(fmt.Errorf("failed to remove link: %w", err))
 		}
 	}()
+
 	if err := os.Symlink(pathToFile, pathToSymlink); err != nil {
-		t.Fatal(fmt.Errorf("Failed to create broken link for test: %+v", err))
+		t.Fatal(fmt.Errorf("failed to create broken link for test: %w", err))
 	}
 
 	// Test copying folder
 	originalDir := filepath.Join(copyFolderContentsFixtureRoot, "symlinks-broken")
 	tmpDir := t.TempDir()
 
-	err := CopyFolderContentsWithFilter(originalDir, tmpDir, func(path string) bool {
-		return !PathContainsHiddenFileOrFolder(path)
+	err := files.CopyFolderContentsWithFilter(originalDir, tmpDir, func(path string) bool {
+		return !files.PathContainsHiddenFileOrFolder(path)
 	})
 	require.NoError(t, err)
 
@@ -140,7 +145,7 @@ func TestCopyFolderContentsWithBrokenSymLinks(t *testing.T) {
 	// compare symlinks in two directories without attempting to dereference any symlinks until diff version 3.3.0.
 	// Because many environments are still using diff < 3.3.0, we disregard this test for now.
 	// Per https://unix.stackexchange.com/a/119406/129208
-	//requireDirectoriesEqual(t, expectedDir, tmpDir)
+	// requireDirectoriesEqual(t, expectedDir, tmpDir)
 	fmt.Println("Test completed without error, however due to a limitation in GNU diff < 3.3.0, directories have not been compared for equivalency.")
 }
 
@@ -150,7 +155,7 @@ func TestCopyTerraformFolderToTemp(t *testing.T) {
 	originalDir := filepath.Join(copyFolderContentsFixtureRoot, "original")
 	expectedDir := filepath.Join(copyFolderContentsFixtureRoot, "no-hidden-files-no-terraform-files")
 
-	tmpDir, err := CopyTerraformFolderToTemp(originalDir, "TestCopyTerraformFolderToTemp")
+	tmpDir, err := files.CopyTerraformFolderToTemp(originalDir, "TestCopyTerraformFolderToTemp")
 	require.NoError(t, err)
 
 	requireDirectoriesEqual(t, expectedDir, tmpDir)
@@ -163,7 +168,7 @@ func TestCopyTerraformFolderToDest(t *testing.T) {
 	expectedDir := filepath.Join(copyFolderContentsFixtureRoot, "no-hidden-files-no-terraform-files")
 	destFolder := os.TempDir()
 
-	tmpDir, err := CopyTerraformFolderToDest(originalDir, destFolder, "TestCopyTerraformFolderToTemp")
+	tmpDir, err := files.CopyTerraformFolderToDest(originalDir, destFolder, "TestCopyTerraformFolderToTemp")
 	require.NoError(t, err)
 
 	requireDirectoriesEqual(t, expectedDir, tmpDir)
@@ -175,7 +180,7 @@ func TestCopyTerragruntFolderToTemp(t *testing.T) {
 	originalDir := filepath.Join(copyFolderContentsFixtureRoot, "terragrunt-files")
 	expectedDir := filepath.Join(copyFolderContentsFixtureRoot, "no-state-files")
 
-	tmpDir, err := CopyTerragruntFolderToTemp(originalDir, t.Name())
+	tmpDir, err := files.CopyTerragruntFolderToTemp(originalDir, t.Name())
 	require.NoError(t, err)
 
 	requireDirectoriesEqual(t, expectedDir, tmpDir)
@@ -188,13 +193,15 @@ func TestCopyTerragruntFolderToDest(t *testing.T) {
 	expectedDir := filepath.Join(copyFolderContentsFixtureRoot, "no-state-files")
 	destFolder := os.TempDir()
 
-	tmpDir, err := CopyTerragruntFolderToDest(originalDir, destFolder, t.Name())
+	tmpDir, err := files.CopyTerragruntFolderToDest(originalDir, destFolder, t.Name())
 	require.NoError(t, err)
 
 	requireDirectoriesEqual(t, expectedDir, tmpDir)
 }
 
 func TestPathContainsTerraformStateOrVars(t *testing.T) {
+	t.Parallel()
+
 	var data = []struct {
 		desc     string
 		path     string
@@ -208,9 +215,10 @@ func TestPathContainsTerraformStateOrVars(t *testing.T) {
 	}
 
 	for _, tt := range data {
-		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
-			result := PathContainsTerraformStateOrVars(tt.path)
+			t.Parallel()
+
+			result := files.PathContainsTerraformStateOrVars(tt.path)
 			if result != tt.contains {
 				if tt.contains {
 					t.Errorf("Expected %s to contain Terraform related file", tt.path)
@@ -226,7 +234,9 @@ func TestPathContainsTerraformStateOrVars(t *testing.T) {
 // takes a lot of code. Why waste time on that when this functionality is already nicely implemented in the Unix/Linux
 // "diff" command? We shell out to that command at test time.
 func requireDirectoriesEqual(t *testing.T, folderWithExpectedContents string, folderWithActualContents string) {
-	cmd := exec.Command("diff", "-r", "-u", folderWithExpectedContents, folderWithActualContents)
+	t.Helper()
+
+	cmd := exec.CommandContext(t.Context(), "diff", "-r", "-u", folderWithExpectedContents, folderWithActualContents)
 
 	bytes, err := cmd.Output()
 	output := string(bytes)
