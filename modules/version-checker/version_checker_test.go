@@ -1,6 +1,7 @@
 package version_checker_test //nolint:staticcheck // package name matches directory convention
 
 import (
+	"errors"
 	"testing"
 
 	checker "github.com/gruntwork-io/terratest/modules/version-checker"
@@ -10,57 +11,50 @@ import (
 func TestParamValidation(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name                 string
-		expectedErrorMessage string
-		param                checker.CheckVersionParams
-		containError         bool
-	}{
-		{
-			name:                 "Empty Params",
-			param:                checker.CheckVersionParams{},
-			containError:         true,
-			expectedErrorMessage: "set WorkingDir in params",
-		},
-		{
-			name: "Missing VersionConstraint",
-			param: checker.CheckVersionParams{
-				Binary:            checker.Docker,
-				VersionConstraint: "",
-				WorkingDir:        ".",
-			},
-			containError:         true,
-			expectedErrorMessage: "set VersionConstraint in params",
-		},
-		{
-			name: "Invalid Version Constraint Format",
-			param: checker.CheckVersionParams{
-				Binary:            checker.Docker,
-				VersionConstraint: "abc",
-				WorkingDir:        ".",
-			},
-			containError:         true,
-			expectedErrorMessage: "invalid version constraint format found {abc}",
-		},
-		{
-			name: "Valid Params",
-			param: checker.CheckVersionParams{
-				Binary:            checker.Docker,
-				VersionConstraint: ">= 0.0.1",
-				WorkingDir:        ".",
-			},
-			containError: false,
-		},
-	}
+	t.Run("Empty Params", func(t *testing.T) {
+		t.Parallel()
+		err := checker.CheckVersionContextE(t, t.Context(), checker.CheckVersionParams{})
 
-	for _, tc := range tests {
-		err := checker.CheckVersionContextE(t, t.Context(), tc.param)
-		if tc.containError {
-			require.EqualError(t, err, tc.expectedErrorMessage, tc.name)
-		} else {
-			require.NoError(t, err, tc.name)
-		}
-	}
+		var missingErr *checker.MissingParamErr
+
+		require.ErrorAs(t, err, &missingErr)
+	})
+
+	t.Run("Missing VersionConstraint", func(t *testing.T) {
+		t.Parallel()
+		err := checker.CheckVersionContextE(t, t.Context(), checker.CheckVersionParams{
+			Binary:            checker.Docker,
+			VersionConstraint: "",
+			WorkingDir:        ".",
+		})
+
+		var missingErr *checker.MissingParamErr
+
+		require.ErrorAs(t, err, &missingErr)
+	})
+
+	t.Run("Invalid Version Constraint Format", func(t *testing.T) {
+		t.Parallel()
+		err := checker.CheckVersionContextE(t, t.Context(), checker.CheckVersionParams{
+			Binary:            checker.Docker,
+			VersionConstraint: "abc",
+			WorkingDir:        ".",
+		})
+
+		var constraintErr *checker.InvalidVersionConstraintErr
+
+		require.ErrorAs(t, err, &constraintErr)
+	})
+
+	t.Run("Valid Params", func(t *testing.T) {
+		t.Parallel()
+		err := checker.CheckVersionContextE(t, t.Context(), checker.CheckVersionParams{
+			Binary:            checker.Docker,
+			VersionConstraint: ">= 0.0.1",
+			WorkingDir:        ".",
+		})
+		require.NoError(t, err)
+	})
 }
 
 func TestCheckVersionConstraintMismatch(t *testing.T) {
@@ -71,8 +65,37 @@ func TestCheckVersionConstraintMismatch(t *testing.T) {
 		VersionConstraint: ">= 999.999.999",
 		WorkingDir:        ".",
 	})
-	require.Error(t, err, "expected version mismatch error")
-	require.Contains(t, err.Error(), "failed the version constraint")
+
+	var mismatchErr *checker.VersionMismatchErr
+
+	require.ErrorAs(t, err, &mismatchErr)
+	require.Equal(t, ">= 999.999.999", mismatchErr.Constraint)
+}
+
+func TestMissingParamErrFields(t *testing.T) {
+	t.Parallel()
+
+	err := checker.CheckVersionContextE(t, t.Context(), checker.CheckVersionParams{})
+
+	var missingErr *checker.MissingParamErr
+
+	require.ErrorAs(t, err, &missingErr)
+	require.Equal(t, "WorkingDir", missingErr.Param)
+}
+
+func TestInvalidVersionConstraintErrUnwrap(t *testing.T) {
+	t.Parallel()
+
+	err := checker.CheckVersionContextE(t, t.Context(), checker.CheckVersionParams{
+		Binary:            checker.Docker,
+		VersionConstraint: "abc",
+		WorkingDir:        ".",
+	})
+
+	var constraintErr *checker.InvalidVersionConstraintErr
+
+	require.ErrorAs(t, err, &constraintErr)
+	require.Error(t, errors.Unwrap(constraintErr), "underlying parse error should be wrapped")
 }
 
 // TestCheckVersionEndToEnd assumes Docker, Terraform, and Packer are installed
@@ -84,22 +107,31 @@ func TestCheckVersionEndToEnd(t *testing.T) {
 		name  string
 		param checker.CheckVersionParams
 	}{
-		{name: "Docker", param: checker.CheckVersionParams{
-			Binary:            checker.Docker,
-			VersionConstraint: ">= 0.0.1",
-			WorkingDir:        ".",
-		}},
-		{name: "Terraform", param: checker.CheckVersionParams{
-			Binary:            checker.Terraform,
-			VersionConstraint: ">= 0.0.1",
-			WorkingDir:        ".",
-		}},
-		{name: "Packer", param: checker.CheckVersionParams{
-			BinaryPath:        "/usr/local/bin/packer",
-			Binary:            checker.Packer,
-			VersionConstraint: ">= 0.0.1",
-			WorkingDir:        ".",
-		}},
+		{
+			name: "Docker",
+			param: checker.CheckVersionParams{
+				Binary:            checker.Docker,
+				VersionConstraint: ">= 0.0.1",
+				WorkingDir:        ".",
+			},
+		},
+		{
+			name: "Terraform",
+			param: checker.CheckVersionParams{
+				Binary:            checker.Terraform,
+				VersionConstraint: ">= 0.0.1",
+				WorkingDir:        ".",
+			},
+		},
+		{
+			name: "Packer",
+			param: checker.CheckVersionParams{
+				BinaryPath:        "/usr/local/bin/packer",
+				Binary:            checker.Packer,
+				VersionConstraint: ">= 0.0.1",
+				WorkingDir:        ".",
+			},
+		},
 	}
 
 	for _, tc := range tests {

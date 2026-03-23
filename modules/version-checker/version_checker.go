@@ -3,7 +3,6 @@ package version_checker //nolint:staticcheck // package name matches directory c
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 
@@ -31,6 +30,7 @@ const (
 	defaultVersionArg = "--version"
 )
 
+// CheckVersionParams contains the parameters for checking a binary's version.
 type CheckVersionParams struct {
 	// BinaryPath is a path to the binary you want to check the version for.
 	BinaryPath string
@@ -88,19 +88,16 @@ func CheckVersionContext(
 	require.NoError(t, CheckVersionContextE(t, ctx, params))
 }
 
-// Validate whether the given params contains valid data to check version.
+// validateParams checks whether the given params contain valid data.
 func validateParams(params CheckVersionParams) error {
-	// Check for empty parameters
 	if params.WorkingDir == "" {
-		return errors.New("set WorkingDir in params")
+		return &MissingParamErr{Param: "WorkingDir"}
 	} else if params.VersionConstraint == "" {
-		return errors.New("set VersionConstraint in params")
+		return &MissingParamErr{Param: "VersionConstraint"}
 	}
 
-	// Check the format of the version constraint if present.
-	if _, err := version.NewConstraint(params.VersionConstraint); params.VersionConstraint != "" && err != nil {
-		return fmt.Errorf(
-			"invalid version constraint format found {%s}", params.VersionConstraint)
+	if _, err := version.NewConstraint(params.VersionConstraint); err != nil {
+		return &InvalidVersionConstraintErr{Constraint: params.VersionConstraint, Underlying: err}
 	}
 
 	return nil
@@ -151,7 +148,7 @@ func getBinary(params CheckVersionParams) (string, error) {
 	case Terraform:
 		return terraform.DefaultExecutable, nil
 	default:
-		return "", fmt.Errorf("unsupported Binary for checking versions {%d}", params.Binary)
+		return "", &UnsupportedBinaryErr{Binary: params.Binary}
 	}
 }
 
@@ -162,7 +159,7 @@ func extractVersionFromShellCommandOutput(output string) (string, error) {
 
 	versionStr := regexMatcher.FindString(output)
 	if versionStr == "" {
-		return "", errors.New("failed to find version using regex matcher")
+		return "", &VersionExtractionErr{Output: output}
 	}
 
 	return versionStr, nil
@@ -178,18 +175,18 @@ func extractVersionFromShellCommandOutput(output string) (string, error) {
 func checkVersionConstraint(actualVersionStr string, versionConstraintStr string) error {
 	actualVersion, err := version.NewVersion(actualVersionStr)
 	if err != nil {
-		return fmt.Errorf("invalid version format found for actualVersionStr: %s", actualVersionStr)
+		return fmt.Errorf("invalid version format found for actualVersionStr %s: %w", actualVersionStr, err)
 	}
 
 	versionConstraint, err := version.NewConstraint(versionConstraintStr)
 	if err != nil {
-		return fmt.Errorf("invalid version format found for versionConstraint: %s", versionConstraintStr)
+		return fmt.Errorf("invalid version format found for versionConstraint %s: %w", versionConstraintStr, err)
 	}
 
 	if !versionConstraint.Check(actualVersion) {
 		return &VersionMismatchErr{
-			errorMessage: fmt.Sprintf("actual version {%s} failed "+
-				"the version constraint {%s}", actualVersionStr, versionConstraint),
+			Actual:     actualVersionStr,
+			Constraint: versionConstraintStr,
 		}
 	}
 
