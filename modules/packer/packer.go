@@ -2,6 +2,7 @@
 package packer
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,29 +12,41 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gruntwork-io/terratest/modules/retry"
-	"github.com/hashicorp/go-multierror"
-	"github.com/stretchr/testify/require"
-
 	"github.com/gruntwork-io/terratest/modules/logger"
+	"github.com/gruntwork-io/terratest/modules/retry"
 	"github.com/gruntwork-io/terratest/modules/shell"
 	"github.com/gruntwork-io/terratest/modules/testing"
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/go-version"
 )
 
+// ErrArtifactIDNotFound is returned when the Packer output does not contain an artifact ID.
+var ErrArtifactIDNotFound = errors.New("could not find artifact ID pattern in packer output")
+
+// BuildNameNotFoundError is returned when the specified build name is not found in the manifest file.
+type BuildNameNotFoundError struct {
+	BuildName    string
+	ManifestPath string
+}
+
+// Error implements the error interface for BuildNameNotFoundError.
+func (e *BuildNameNotFoundError) Error() string {
+	return fmt.Sprintf("build name %s not found in manifest file %s", e.BuildName, e.ManifestPath)
+}
+
 // Options are the options for Packer.
 type Options struct {
-	Template                   string            // The path to the Packer template
 	Vars                       map[string]string // The custom vars to pass when running the build command
-	VarFiles                   []string          // Var file paths to pass Packer using -var-file option
-	Only                       string            // If specified, only run the build of this name
-	Except                     string            // Runs the build excluding the specified builds and post-processors
 	Env                        map[string]string // Custom environment variables to set when running Packer
 	RetryableErrors            map[string]string // If packer build fails with one of these (transient) errors, retry. The keys are a regexp to match against the error and the message is what to display to a user if that error is matched.
-	MaxRetries                 int               // Maximum number of times to retry errors matching RetryableErrors
-	TimeBetweenRetries         time.Duration     // The amount of time to wait between retries
-	WorkingDir                 string            // The directory to run packer in
 	Logger                     *logger.Logger    // If set, use a non-default logger
+	Template                   string            // The path to the Packer template
+	Only                       string            // If specified, only run the build of this name
+	Except                     string            // Runs the build excluding the specified builds and post-processors
+	WorkingDir                 string            // The directory to run packer in
+	VarFiles                   []string          // Var file paths to pass Packer using -var-file option
+	TimeBetweenRetries         time.Duration     // The amount of time to wait between retries
+	MaxRetries                 int               // Maximum number of times to retry errors matching RetryableErrors
 	DisableTemporaryPluginPath bool              // If set, do not use a temporary directory for Packer plugins.
 }
 
@@ -43,7 +56,6 @@ type Options struct {
 // know which generated artifact is which.
 func BuildArtifacts(t testing.TestingT, artifactNameToOptions map[string]*Options) map[string]string {
 	result, err := BuildArtifactsE(t, artifactNameToOptions)
-
 	if err != nil {
 		t.Fatalf("Error building artifacts: %s", err.Error())
 	}
@@ -58,31 +70,28 @@ func BuildArtifacts(t testing.TestingT, artifactNameToOptions map[string]*Option
 // know which generated artifact is which.
 func BuildArtifactsE(t testing.TestingT, artifactNameToOptions map[string]*Options) (map[string]string, error) {
 	var waitForArtifacts sync.WaitGroup
+
 	waitForArtifacts.Add(len(artifactNameToOptions))
 
-	var artifactNameToArtifactId = map[string]string{}
-	var errorsOccurred = new(multierror.Error)
+	artifactNameToArtifactID := map[string]string{}
+	errorsOccurred := new(multierror.Error)
 
 	for artifactName, curOptions := range artifactNameToOptions {
-		// The following is necessary to make sure artifactName and curOptions don't
-		// get updated due to concurrency within the scope of t.Run(..) below
-		artifactName := artifactName
-		curOptions := curOptions
 		go func() {
 			defer waitForArtifacts.Done()
-			artifactId, err := BuildArtifactE(t, curOptions)
 
+			artifactID, err := BuildArtifactE(t, curOptions)
 			if err != nil {
 				errorsOccurred = multierror.Append(errorsOccurred, err)
 			} else {
-				artifactNameToArtifactId[artifactName] = artifactId
+				artifactNameToArtifactID[artifactName] = artifactID
 			}
 		}()
 	}
 
 	waitForArtifacts.Wait()
 
-	return artifactNameToArtifactId, errorsOccurred.ErrorOrNil()
+	return artifactNameToArtifactID, errorsOccurred.ErrorOrNil()
 }
 
 // BuildArtifact builds the given Packer template and return the generated Artifact ID.
@@ -91,6 +100,7 @@ func BuildArtifact(t testing.TestingT, options *Options) string {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return artifactID
 }
 
@@ -105,14 +115,21 @@ func BuildArtifactE(t testing.TestingT, options *Options) (string, error) {
 	if !options.DisableTemporaryPluginPath {
 		// The built-in env variable defining where plugins are downloaded
 		const packerPluginPathEnvVar = "PACKER_PLUGIN_PATH"
+
 		options.Logger.Logf(t, "Creating a temporary directory for Packer plugins")
+
 		pluginDir, err := os.MkdirTemp("", "terratest-packer-")
-		require.NoError(t, err)
+		if err != nil {
+			return "", fmt.Errorf("creating temporary plugin directory: %w", err)
+		}
+
 		if len(options.Env) == 0 {
 			options.Env = make(map[string]string)
 		}
+
 		options.Env[packerPluginPathEnvVar] = pluginDir
-		defer os.RemoveAll(pluginDir)
+
+		defer func() { _ = os.RemoveAll(pluginDir) }()
 	}
 
 	err := packerInit(t, options)
@@ -122,21 +139,21 @@ func BuildArtifactE(t testing.TestingT, options *Options) (string, error) {
 
 	cmd := shell.Command{
 		Command:    "packer",
-		Args:       formatPackerArgs(options),
+		Args:       FormatPackerArgs(options),
 		Env:        options.Env,
 		WorkingDir: options.WorkingDir,
 	}
 
 	description := fmt.Sprintf("%s %v", cmd.Command, cmd.Args)
-	output, err := retry.DoWithRetryableErrorsE(t, description, options.RetryableErrors, options.MaxRetries, options.TimeBetweenRetries, func() (string, error) {
-		return shell.RunCommandAndGetOutputE(t, cmd)
-	})
 
+	output, err := retry.DoWithRetryableErrorsE(t, description, options.RetryableErrors, options.MaxRetries, options.TimeBetweenRetries, func() (string, error) {
+		return shell.RunCommandContextAndGetOutputE(t, context.Background(), &cmd)
+	})
 	if err != nil {
 		return "", err
 	}
 
-	return extractArtifactID(output)
+	return ExtractArtifactID(output)
 }
 
 // BuildAmi builds the given Packer template and return the generated AMI ID.
@@ -153,6 +170,12 @@ func BuildAmiE(t testing.TestingT, options *Options) (string, error) {
 	return BuildArtifactE(t, options)
 }
 
+// artifactIDMatchLen is the expected number of submatches (full match + capture group)
+// from the artifact ID regex.
+const artifactIDMatchLen = 2
+
+// ExtractArtifactID extracts the artifact ID from Packer machine-readable log output.
+//
 // The Packer machine-readable log output should contain an entry of this format:
 //
 // AWS: <timestamp>,<builder>,artifact,<index>,id,<region>:<image_id>
@@ -162,20 +185,22 @@ func BuildAmiE(t testing.TestingT, options *Options) (string, error) {
 //
 // 1456332887,amazon-ebs,artifact,0,id,us-east-1:ami-b481b3de
 // 1533742764,googlecompute,artifact,0,id,terratest-packer-example-2018-08-08t15-35-19z
-func extractArtifactID(packerLogOutput string) (string, error) {
+func ExtractArtifactID(packerLogOutput string) (string, error) {
 	re := regexp.MustCompile(`.+artifact,\d+?,id,(?:.+?:|)(.+)`)
 	matches := re.FindStringSubmatch(packerLogOutput)
 
-	if len(matches) == 2 {
+	if len(matches) == artifactIDMatchLen {
 		return matches[1], nil
 	}
-	return "", errors.New("Could not find Artifact ID pattern in Packer output")
+
+	return "", ErrArtifactIDNotFound
 }
 
-// Check if the local version of Packer has init
+// hasPackerInit checks if the local version of Packer supports the init command.
 func hasPackerInit(t testing.TestingT, options *Options) (bool, error) {
 	// The init command was introduced in Packer 1.7.0
 	const packerInitVersion = "1.7.0"
+
 	minInitVersion, err := version.NewVersion(packerInitVersion)
 	if err != nil {
 		return false, err
@@ -187,11 +212,14 @@ func hasPackerInit(t testing.TestingT, options *Options) (bool, error) {
 		Env:        options.Env,
 		WorkingDir: options.WorkingDir,
 	}
-	versionCmdOutput, err := shell.RunCommandAndGetOutputE(t, cmd)
+
+	versionCmdOutput, err := shell.RunCommandContextAndGetOutputE(t, context.Background(), &cmd)
 	if err != nil {
 		return false, err
 	}
-	localVersion := trimPackerVersion(versionCmdOutput)
+
+	localVersion := TrimPackerVersion(versionCmdOutput)
+
 	thisVersion, err := version.NewVersion(localVersion)
 	if err != nil {
 		return false, err
@@ -204,12 +232,13 @@ func hasPackerInit(t testing.TestingT, options *Options) (bool, error) {
 	return true, nil
 }
 
-// packerInit runs 'packer init' if it is supported by the local packer
+// packerInit runs 'packer init' if it is supported by the local packer.
 func packerInit(t testing.TestingT, options *Options) error {
 	hasInit, err := hasPackerInit(t, options)
 	if err != nil {
 		return err
 	}
+
 	if !hasInit {
 		options.Logger.Logf(t, "Skipping 'packer init' because it is not present in this version")
 		return nil
@@ -229,25 +258,22 @@ func packerInit(t testing.TestingT, options *Options) error {
 	}
 
 	description := "Running Packer init"
+
 	_, err = retry.DoWithRetryableErrorsE(t, description, options.RetryableErrors, options.MaxRetries, options.TimeBetweenRetries, func() (string, error) {
-		return shell.RunCommandAndGetOutputE(t, cmd)
+		return shell.RunCommandContextAndGetOutputE(t, context.Background(), &cmd)
 	})
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-// Convert the inputs to a format palatable to packer. The build command should have the format:
+// FormatPackerArgs converts the inputs to a format palatable to packer. The build command should have the format:
 //
 // packer build [OPTIONS] template
-func formatPackerArgs(options *Options) []string {
+func FormatPackerArgs(options *Options) []string {
 	args := []string{"build", "-machine-readable"}
 
 	for key, value := range options.Vars {
-		args = append(args, "-var", fmt.Sprintf("%s=%s", key, value))
+		args = append(args, "-var", key+"="+value)
 	}
 
 	for _, filePath := range options.VarFiles {
@@ -255,39 +281,42 @@ func formatPackerArgs(options *Options) []string {
 	}
 
 	if options.Only != "" {
-		args = append(args, fmt.Sprintf("-only=%s", options.Only))
+		args = append(args, "-only="+options.Only)
 	}
 
 	if options.Except != "" {
-		args = append(args, fmt.Sprintf("-except=%s", options.Except))
+		args = append(args, "-except="+options.Except)
 	}
 
 	return append(args, options.Template)
 }
 
-// From packer 1.10 the -version command output is prefixed with Packer v
-func trimPackerVersion(versionCmdOutput string) string {
+// TrimPackerVersion extracts the version number from packer version output.
+// From packer 1.10 the -version command output is prefixed with "Packer v".
+func TrimPackerVersion(versionCmdOutput string) string {
 	re := regexp.MustCompile(`(?:Packer v?|)(\d+\.\d+\.\d+)`)
 	matches := re.FindStringSubmatch(versionCmdOutput)
+
 	if len(matches) > 1 {
 		return matches[1]
 	}
+
 	return ""
 }
 
 type packerManifest struct {
-	Builds      []packerManifestBuild `json:"builds"`
 	LastRunUUID string                `json:"last_run_uuid"`
+	Builds      []packerManifestBuild `json:"builds"`
 }
 
 type packerManifestBuild struct {
 	Name          string                    `json:"name"`
 	BuilderType   string                    `json:"builder_type"`
-	BuildTime     int64                     `json:"build_time"`
-	Files         []packerManifestBuildFile `json:"files"`
 	ArtifactID    string                    `json:"artifact_id"`
 	PackerRunUUID string                    `json:"packer_run_uuid"`
 	CustomData    map[string]interface{}    `json:"custom_data"`
+	Files         []packerManifestBuildFile `json:"files"`
+	BuildTime     int64                     `json:"build_time"`
 }
 
 type packerManifestBuildFile struct {
@@ -295,42 +324,37 @@ type packerManifestBuildFile struct {
 	Size int64  `json:"size"`
 }
 
-// GetArtifactIDFromManifestBuildName returns the artifact id from a build name contained in the manifest file
-// see https://developer.hashicorp.com/packer/docs/post-processors/manifest for more info
-// if the build name is not found, it will fail the test
+// GetArtifactIDFromManifestBuildName returns the artifact id from a build name contained in the manifest file.
+// See https://developer.hashicorp.com/packer/docs/post-processors/manifest for more info.
+// If the build name is not found, it will fail the test.
 func GetArtifactIDFromManifestBuildName(t testing.TestingT, manifestPath string, buildName string) string {
 	artifactID, err := GetArtifactIDFromManifestBuildNameE(t, manifestPath, buildName)
 	if err != nil {
 		t.Fatalf("failed to get artifact id from manifest build name: %s", err)
 	}
+
 	return artifactID
 }
 
-// GetArtifactIDFromManifestBuildNameE returns the artifact id from a build name contained in the manifest file
-// see https://developer.hashicorp.com/packer/docs/post-processors/manifest for more info
-func GetArtifactIDFromManifestBuildNameE(t testing.TestingT, manifestPath string, buildName string) (artifactID string, err error) {
+// GetArtifactIDFromManifestBuildNameE returns the artifact id from a build name contained in the manifest file.
+// See https://developer.hashicorp.com/packer/docs/post-processors/manifest for more info.
+func GetArtifactIDFromManifestBuildNameE(t testing.TestingT, manifestPath string, buildName string) (string, error) {
 	b, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return "", fmt.Errorf("error reading manifest file: %w", err)
+		return "", fmt.Errorf("reading manifest file: %w", err)
 	}
 
 	var manifest packerManifest
+
 	if err = json.Unmarshal(b, &manifest); err != nil {
-		return "", fmt.Errorf("error unmarshalling manifest file: %w", err)
+		return "", fmt.Errorf("unmarshalling manifest file: %w", err)
 	}
 
-	found := false
 	for _, build := range manifest.Builds {
-		if build.Name != buildName {
-			continue
+		if build.Name == buildName {
+			return build.ArtifactID, nil
 		}
-
-		artifactID, found = build.ArtifactID, true
-		break
-	}
-	if !found {
-		return "", fmt.Errorf("build name %s not found in manifest file %s", buildName, manifestPath)
 	}
 
-	return artifactID, nil
+	return "", &BuildNameNotFoundError{BuildName: buildName, ManifestPath: manifestPath}
 }
