@@ -67,7 +67,7 @@ func CheckVersionContextE(
 		return err
 	}
 
-	return checkVersionConstraint(binaryVersion, params.VersionConstraint)
+	return CheckVersionConstraint(binaryVersion, params.VersionConstraint)
 }
 
 // CheckVersion checks whether the given Binary version is greater than or equal to the
@@ -124,7 +124,7 @@ func getVersionWithShellCommand(t testing.TestingT, ctx context.Context, params 
 			"w/ version args {%s}: %w", binary, versionArg, err)
 	}
 
-	versionStr, err := extractVersionFromShellCommandOutput(output)
+	versionStr, err := ExtractVersionFromShellCommandOutput(output)
 	if err != nil {
 		return "", fmt.Errorf("failed to extract version from shell "+
 			"command output {%s}: %w", output, err)
@@ -152,9 +152,9 @@ func getBinary(params CheckVersionParams) (string, error) {
 	}
 }
 
-// extractVersionFromShellCommandOutput extracts version with regex string matching
+// ExtractVersionFromShellCommandOutput extracts version with regex string matching
 // from the given shell command output string.
-func extractVersionFromShellCommandOutput(output string) (string, error) {
+func ExtractVersionFromShellCommandOutput(output string) (string, error) {
 	regexMatcher := regexp.MustCompile(versionRegexMatcher)
 
 	versionStr := regexMatcher.FindString(output)
@@ -165,22 +165,22 @@ func extractVersionFromShellCommandOutput(output string) (string, error) {
 	return versionStr, nil
 }
 
-// checkVersionConstraint checks whether the given version pass the version constraint.
+// CheckVersionConstraint checks whether the given version passes the version constraint.
 //
-// It returns Error for ill-formatted version string and VersionMismatchErr for
-// minimum version check failure.
+// It returns [InvalidVersionFormatErr] for ill-formatted version strings and
+// [VersionMismatchErr] when the version does not satisfy the constraint.
 //
-//	checkVersionConstraint(t, "1.2.31",  ">= 1.2.0, < 2.0.0") - no error
-//	checkVersionConstraint(t, "1.0.31",  ">= 1.2.0, < 2.0.0") - error
-func checkVersionConstraint(actualVersionStr string, versionConstraintStr string) error {
+//	CheckVersionConstraint("1.2.31",  ">= 1.2.0, < 2.0.0") - no error
+//	CheckVersionConstraint("1.0.31",  ">= 1.2.0, < 2.0.0") - error
+func CheckVersionConstraint(actualVersionStr string, versionConstraintStr string) error {
 	actualVersion, err := version.NewVersion(actualVersionStr)
 	if err != nil {
-		return fmt.Errorf("invalid version format found for actualVersionStr %s: %w", actualVersionStr, err)
+		return &InvalidVersionFormatErr{Field: "actualVersionStr", Value: actualVersionStr, Underlying: err}
 	}
 
 	versionConstraint, err := version.NewConstraint(versionConstraintStr)
 	if err != nil {
-		return fmt.Errorf("invalid version format found for versionConstraint %s: %w", versionConstraintStr, err)
+		return &InvalidVersionFormatErr{Field: "versionConstraint", Value: versionConstraintStr, Underlying: err}
 	}
 
 	if !versionConstraint.Check(actualVersion) {

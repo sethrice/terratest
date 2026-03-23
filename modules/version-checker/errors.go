@@ -48,6 +48,21 @@ func (e *UnsupportedBinaryErr) Error() string {
 	return fmt.Sprintf("unsupported Binary for checking versions {%d}", e.Binary)
 }
 
+// InvalidVersionFormatErr is returned when a version string cannot be parsed.
+type InvalidVersionFormatErr struct {
+	Underlying error
+	Field      string
+	Value      string
+}
+
+func (e *InvalidVersionFormatErr) Error() string {
+	return fmt.Sprintf("invalid version format found for %s %s: %s", e.Field, e.Value, e.Underlying)
+}
+
+func (e *InvalidVersionFormatErr) Unwrap() error {
+	return e.Underlying
+}
+
 // VersionExtractionErr is returned when the version string cannot be parsed
 // from the output of running a binary's --version command.
 type VersionExtractionErr struct {

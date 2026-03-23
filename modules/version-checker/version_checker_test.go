@@ -98,6 +98,113 @@ func TestInvalidVersionConstraintErrUnwrap(t *testing.T) {
 	require.Error(t, errors.Unwrap(constraintErr), "underlying parse error should be wrapped")
 }
 
+func TestExtractVersionFromShellCommandOutput(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Stand-alone version string", func(t *testing.T) {
+		t.Parallel()
+
+		versionStr, err := checker.ExtractVersionFromShellCommandOutput("version is 1.2.3")
+		require.NoError(t, err)
+		require.Equal(t, "1.2.3", versionStr)
+	})
+
+	t.Run("version string with v prefix", func(t *testing.T) {
+		t.Parallel()
+
+		versionStr, err := checker.ExtractVersionFromShellCommandOutput("version is v1.0.0")
+		require.NoError(t, err)
+		require.Equal(t, "1.0.0", versionStr)
+	})
+
+	t.Run("2 digit version string", func(t *testing.T) {
+		t.Parallel()
+
+		versionStr, err := checker.ExtractVersionFromShellCommandOutput("version is v1.0")
+		require.NoError(t, err)
+		require.Equal(t, "1.0", versionStr)
+	})
+
+	t.Run("invalid output string", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := checker.ExtractVersionFromShellCommandOutput("version is vabc")
+
+		var extractionErr *checker.VersionExtractionErr
+
+		require.ErrorAs(t, err, &extractionErr)
+	})
+
+	t.Run("empty output string", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := checker.ExtractVersionFromShellCommandOutput("")
+
+		var extractionErr *checker.VersionExtractionErr
+
+		require.ErrorAs(t, err, &extractionErr)
+	})
+}
+
+func TestCheckVersionConstraint(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid actualVersionStr", func(t *testing.T) {
+		t.Parallel()
+
+		err := checker.CheckVersionConstraint("", "1.2.3")
+
+		var formatErr *checker.InvalidVersionFormatErr
+
+		require.ErrorAs(t, err, &formatErr)
+		require.Equal(t, "actualVersionStr", formatErr.Field)
+	})
+
+	t.Run("invalid versionConstraint", func(t *testing.T) {
+		t.Parallel()
+
+		err := checker.CheckVersionConstraint("1.2.3", "")
+
+		var formatErr *checker.InvalidVersionFormatErr
+
+		require.ErrorAs(t, err, &formatErr)
+		require.Equal(t, "versionConstraint", formatErr.Field)
+	})
+
+	t.Run("pass version constraint", func(t *testing.T) {
+		t.Parallel()
+
+		err := checker.CheckVersionConstraint("1.2.3", "1.2.3")
+		require.NoError(t, err)
+	})
+
+	t.Run("fail version constraint", func(t *testing.T) {
+		t.Parallel()
+
+		err := checker.CheckVersionConstraint("1.2.3", "1.2.4")
+
+		var mismatchErr *checker.VersionMismatchErr
+
+		require.ErrorAs(t, err, &mismatchErr)
+		require.Equal(t, "1.2.3", mismatchErr.Actual)
+		require.Equal(t, "1.2.4", mismatchErr.Constraint)
+	})
+
+	t.Run("pessimistic constraint operator", func(t *testing.T) {
+		t.Parallel()
+
+		err := checker.CheckVersionConstraint("1.0.5", "~> 1.0.4")
+		require.NoError(t, err)
+	})
+
+	t.Run("compound constraint operators", func(t *testing.T) {
+		t.Parallel()
+
+		err := checker.CheckVersionConstraint("1.2.7", ">= 1.2.0, < 2.0.0")
+		require.NoError(t, err)
+	})
+}
+
 // TestCheckVersionEndToEnd assumes Docker, Terraform, and Packer are installed
 // and their versions are greater than 0.0.1.
 func TestCheckVersionEndToEnd(t *testing.T) {
