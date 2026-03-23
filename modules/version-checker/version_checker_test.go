@@ -54,7 +54,7 @@ func TestParamValidation(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		err := checker.CheckVersionE(t, tc.param)
+		err := checker.CheckVersionContextE(t, t.Context(), tc.param)
 		if tc.containError {
 			require.EqualError(t, err, tc.expectedErrorMessage, tc.name)
 		} else {
@@ -66,7 +66,7 @@ func TestParamValidation(t *testing.T) {
 func TestCheckVersionConstraintMismatch(t *testing.T) {
 	t.Parallel()
 
-	err := checker.CheckVersionE(t, checker.CheckVersionParams{
+	err := checker.CheckVersionContextE(t, t.Context(), checker.CheckVersionParams{
 		Binary:            checker.Docker,
 		VersionConstraint: ">= 999.999.999",
 		WorkingDir:        ".",
@@ -103,7 +103,7 @@ func TestCheckVersionEndToEnd(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		err := checker.CheckVersionE(t, tc.param)
+		err := checker.CheckVersionContextE(t, t.Context(), tc.param)
 		require.NoError(t, err, tc.name)
 	}
 }

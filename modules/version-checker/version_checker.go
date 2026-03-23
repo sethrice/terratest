@@ -45,14 +45,24 @@ type CheckVersionParams struct {
 
 // CheckVersionE checks whether the given Binary version is greater than or equal
 // to the given expected version.
+//
+// Deprecated: Use CheckVersionContextE instead.
 func CheckVersionE(
 	t testing.TestingT,
+	params CheckVersionParams) error {
+	return CheckVersionContextE(t, context.Background(), params)
+}
+
+// CheckVersionContextE is like CheckVersionE but includes a context.
+func CheckVersionContextE(
+	t testing.TestingT,
+	ctx context.Context,
 	params CheckVersionParams) error {
 	if err := validateParams(params); err != nil {
 		return err
 	}
 
-	binaryVersion, err := getVersionWithShellCommand(t, params)
+	binaryVersion, err := getVersionWithShellCommand(t, ctx, params)
 	if err != nil {
 		return err
 	}
@@ -62,10 +72,20 @@ func CheckVersionE(
 
 // CheckVersion checks whether the given Binary version is greater than or equal to the
 // given expected version and fails if it's not.
+//
+// Deprecated: Use CheckVersionContext instead.
 func CheckVersion(
 	t testing.TestingT,
 	params CheckVersionParams) {
 	require.NoError(t, CheckVersionE(t, params))
+}
+
+// CheckVersionContext is like CheckVersion but includes a context.
+func CheckVersionContext(
+	t testing.TestingT,
+	ctx context.Context,
+	params CheckVersionParams) {
+	require.NoError(t, CheckVersionContextE(t, ctx, params))
 }
 
 // Validate whether the given params contains valid data to check version.
@@ -87,7 +107,7 @@ func validateParams(params CheckVersionParams) error {
 }
 
 // getVersionWithShellCommand get version by running a shell command.
-func getVersionWithShellCommand(t testing.TestingT, params CheckVersionParams) (string, error) {
+func getVersionWithShellCommand(t testing.TestingT, ctx context.Context, params CheckVersionParams) (string, error) {
 	var versionArg = defaultVersionArg
 
 	binary, err := getBinary(params)
@@ -96,7 +116,7 @@ func getVersionWithShellCommand(t testing.TestingT, params CheckVersionParams) (
 	}
 
 	// Run a shell command to get the version string.
-	output, err := shell.RunCommandContextAndGetOutputE(t, context.Background(), &shell.Command{
+	output, err := shell.RunCommandContextAndGetOutputE(t, ctx, &shell.Command{
 		Command:    binary,
 		Args:       []string{versionArg},
 		WorkingDir: params.WorkingDir,
