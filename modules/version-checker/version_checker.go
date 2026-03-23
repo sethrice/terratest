@@ -1,12 +1,14 @@
-package version_checker
+// Package version_checker provides utilities for checking binary versions against constraints.
+package version_checker //nolint:staticcheck // package name matches directory convention
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"regexp"
 
-	"github.com/gruntwork-io/terratest/modules/terraform"
-
 	"github.com/gruntwork-io/terratest/modules/shell"
+	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/gruntwork-io/terratest/modules/testing"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
@@ -32,13 +34,13 @@ const (
 type CheckVersionParams struct {
 	// BinaryPath is a path to the binary you want to check the version for.
 	BinaryPath string
-	// Binary is the name of the binary you want to check the version for.
-	Binary VersionCheckerBinary
 	// VersionConstraint is a string literal containing one or more conditions, which are separated by commas.
 	// More information here:https://www.terraform.io/language/expressions/version-constraints
 	VersionConstraint string
 	// WorkingDir is a directory you want to run the shell command.
 	WorkingDir string
+	// Binary is the name of the binary you want to check the version for.
+	Binary VersionCheckerBinary
 }
 
 // CheckVersionE checks whether the given Binary version is greater than or equal
@@ -46,7 +48,6 @@ type CheckVersionParams struct {
 func CheckVersionE(
 	t testing.TestingT,
 	params CheckVersionParams) error {
-
 	if err := validateParams(params); err != nil {
 		return err
 	}
@@ -71,9 +72,9 @@ func CheckVersion(
 func validateParams(params CheckVersionParams) error {
 	// Check for empty parameters
 	if params.WorkingDir == "" {
-		return fmt.Errorf("set WorkingDir in params")
+		return errors.New("set WorkingDir in params")
 	} else if params.VersionConstraint == "" {
-		return fmt.Errorf("set VersionConstraint in params")
+		return errors.New("set VersionConstraint in params")
 	}
 
 	// Check the format of the version constraint if present.
@@ -88,13 +89,14 @@ func validateParams(params CheckVersionParams) error {
 // getVersionWithShellCommand get version by running a shell command.
 func getVersionWithShellCommand(t testing.TestingT, params CheckVersionParams) (string, error) {
 	var versionArg = defaultVersionArg
+
 	binary, err := getBinary(params)
 	if err != nil {
 		return "", err
 	}
 
 	// Run a shell command to get the version string.
-	output, err := shell.RunCommandAndGetOutputE(t, shell.Command{
+	output, err := shell.RunCommandContextAndGetOutputE(t, context.Background(), &shell.Command{
 		Command:    binary,
 		Args:       []string{versionArg},
 		WorkingDir: params.WorkingDir,
@@ -137,9 +139,10 @@ func getBinary(params CheckVersionParams) (string, error) {
 // from the given shell command output string.
 func extractVersionFromShellCommandOutput(output string) (string, error) {
 	regexMatcher := regexp.MustCompile(versionRegexMatcher)
+
 	versionStr := regexMatcher.FindString(output)
 	if versionStr == "" {
-		return "", fmt.Errorf("failed to find version using regex matcher")
+		return "", errors.New("failed to find version using regex matcher")
 	}
 
 	return versionStr, nil
@@ -168,7 +171,6 @@ func checkVersionConstraint(actualVersionStr string, versionConstraintStr string
 			errorMessage: fmt.Sprintf("actual version {%s} failed "+
 				"the version constraint {%s}", actualVersionStr, versionConstraint),
 		}
-
 	}
 
 	return nil
