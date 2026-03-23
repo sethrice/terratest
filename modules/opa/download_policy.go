@@ -2,6 +2,7 @@ package opa
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -33,7 +34,7 @@ var (
 func DownloadPolicyE(t testing.TestingT, rulePath string) (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("getting current working directory: %w", err)
 	}
 
 	// File getters are assumed to be a local path reference, so pass through the original path.
@@ -50,6 +51,7 @@ func DownloadPolicyE(t testing.TestingT, rulePath string) (string, error) {
 
 	// First, check if we had already downloaded the source and it is in our cache.
 	baseDir, subDir := getter.SourceDirSubdir(rulePath)
+
 	downloadPath, hasDownloaded := policyDirCache.Load(baseDir)
 	if hasDownloaded {
 		logger.Default.Logf(t, "Previously downloaded %s: returning cached path", baseDir)
@@ -59,16 +61,20 @@ func DownloadPolicyE(t testing.TestingT, rulePath string) (string, error) {
 	// Not downloaded, so use go-getter to download the remote source to a temp dir.
 	tempDir, err := os.MkdirTemp("", "terratest-opa-policy-*")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("creating temp directory for policy download: %w", err)
 	}
+
 	// go-getter doesn't work if you give it a directory that already exists, so we add an additional path in the
 	// tempDir to make sure we feed a directory that doesn't exist yet.
 	tempDir = filepath.Join(tempDir, "getter")
 
 	logger.Default.Logf(t, "Downloading %s to temp dir %s", rulePath, tempDir)
+
 	if _, err := getter.GetAny(context.Background(), tempDir, baseDir); err != nil {
-		return "", err
+		return "", fmt.Errorf("downloading policy from %s: %w", baseDir, err)
 	}
+
 	policyDirCache.Store(baseDir, tempDir)
+
 	return filepath.Join(tempDir, subDir), nil
 }
