@@ -1,12 +1,13 @@
-package version_checker
+// Package version_checker provides utilities for checking binary versions against constraints.
+package version_checker //nolint:staticcheck // package name matches directory convention
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 
-	"github.com/gruntwork-io/terratest/modules/terraform"
-
 	"github.com/gruntwork-io/terratest/modules/shell"
+	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/gruntwork-io/terratest/modules/testing"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
@@ -29,72 +30,90 @@ const (
 	defaultVersionArg = "--version"
 )
 
+// CheckVersionParams contains the parameters for checking a binary's version.
 type CheckVersionParams struct {
 	// BinaryPath is a path to the binary you want to check the version for.
 	BinaryPath string
-	// Binary is the name of the binary you want to check the version for.
-	Binary VersionCheckerBinary
 	// VersionConstraint is a string literal containing one or more conditions, which are separated by commas.
 	// More information here:https://www.terraform.io/language/expressions/version-constraints
 	VersionConstraint string
 	// WorkingDir is a directory you want to run the shell command.
 	WorkingDir string
+	// Binary is the name of the binary you want to check the version for.
+	Binary VersionCheckerBinary
 }
 
 // CheckVersionE checks whether the given Binary version is greater than or equal
 // to the given expected version.
+//
+// Deprecated: Use CheckVersionContextE instead.
 func CheckVersionE(
 	t testing.TestingT,
 	params CheckVersionParams) error {
+	return CheckVersionContextE(t, context.Background(), params)
+}
 
+// CheckVersionContextE is like CheckVersionE but includes a context.
+func CheckVersionContextE(
+	t testing.TestingT,
+	ctx context.Context,
+	params CheckVersionParams) error {
 	if err := validateParams(params); err != nil {
 		return err
 	}
 
-	binaryVersion, err := getVersionWithShellCommand(t, params)
+	binaryVersion, err := getVersionWithShellCommand(t, ctx, params)
 	if err != nil {
 		return err
 	}
 
-	return checkVersionConstraint(binaryVersion, params.VersionConstraint)
+	return CheckVersionConstraint(binaryVersion, params.VersionConstraint)
 }
 
 // CheckVersion checks whether the given Binary version is greater than or equal to the
 // given expected version and fails if it's not.
+//
+// Deprecated: Use CheckVersionContext instead.
 func CheckVersion(
 	t testing.TestingT,
 	params CheckVersionParams) {
 	require.NoError(t, CheckVersionE(t, params))
 }
 
-// Validate whether the given params contains valid data to check version.
+// CheckVersionContext is like CheckVersion but includes a context.
+func CheckVersionContext(
+	t testing.TestingT,
+	ctx context.Context,
+	params CheckVersionParams) {
+	require.NoError(t, CheckVersionContextE(t, ctx, params))
+}
+
+// validateParams checks whether the given params contain valid data.
 func validateParams(params CheckVersionParams) error {
-	// Check for empty parameters
 	if params.WorkingDir == "" {
-		return fmt.Errorf("set WorkingDir in params")
+		return &MissingParamErr{Param: "WorkingDir"}
 	} else if params.VersionConstraint == "" {
-		return fmt.Errorf("set VersionConstraint in params")
+		return &MissingParamErr{Param: "VersionConstraint"}
 	}
 
-	// Check the format of the version constraint if present.
-	if _, err := version.NewConstraint(params.VersionConstraint); params.VersionConstraint != "" && err != nil {
-		return fmt.Errorf(
-			"invalid version constraint format found {%s}", params.VersionConstraint)
+	if _, err := version.NewConstraint(params.VersionConstraint); err != nil {
+		return &InvalidVersionConstraintErr{Constraint: params.VersionConstraint, Underlying: err}
 	}
 
 	return nil
 }
 
 // getVersionWithShellCommand get version by running a shell command.
-func getVersionWithShellCommand(t testing.TestingT, params CheckVersionParams) (string, error) {
+func getVersionWithShellCommand(t testing.TestingT, ctx context.Context, params CheckVersionParams) (string, error) {
 	var versionArg = defaultVersionArg
+
 	binary, err := getBinary(params)
 	if err != nil {
 		return "", err
 	}
 
 	// Run a shell command to get the version string.
-	output, err := shell.RunCommandAndGetOutputE(t, shell.Command{
+	output, err := shell.RunCommandContextAndGetOutputE(t, ctx, &shell.Command{
 		Command:    binary,
 		Args:       []string{versionArg},
 		WorkingDir: params.WorkingDir,
@@ -105,7 +124,7 @@ func getVersionWithShellCommand(t testing.TestingT, params CheckVersionParams) (
 			"w/ version args {%s}: %w", binary, versionArg, err)
 	}
 
-	versionStr, err := extractVersionFromShellCommandOutput(output)
+	versionStr, err := ExtractVersionFromShellCommandOutput(output)
 	if err != nil {
 		return "", fmt.Errorf("failed to extract version from shell "+
 			"command output {%s}: %w", output, err)
@@ -129,46 +148,46 @@ func getBinary(params CheckVersionParams) (string, error) {
 	case Terraform:
 		return terraform.DefaultExecutable, nil
 	default:
-		return "", fmt.Errorf("unsupported Binary for checking versions {%d}", params.Binary)
+		return "", &UnsupportedBinaryErr{Binary: params.Binary}
 	}
 }
 
-// extractVersionFromShellCommandOutput extracts version with regex string matching
+// ExtractVersionFromShellCommandOutput extracts version with regex string matching
 // from the given shell command output string.
-func extractVersionFromShellCommandOutput(output string) (string, error) {
+func ExtractVersionFromShellCommandOutput(output string) (string, error) {
 	regexMatcher := regexp.MustCompile(versionRegexMatcher)
+
 	versionStr := regexMatcher.FindString(output)
 	if versionStr == "" {
-		return "", fmt.Errorf("failed to find version using regex matcher")
+		return "", &VersionExtractionErr{Output: output}
 	}
 
 	return versionStr, nil
 }
 
-// checkVersionConstraint checks whether the given version pass the version constraint.
+// CheckVersionConstraint checks whether the given version passes the version constraint.
 //
-// It returns Error for ill-formatted version string and VersionMismatchErr for
-// minimum version check failure.
+// It returns [InvalidVersionFormatErr] for ill-formatted version strings and
+// [VersionMismatchErr] when the version does not satisfy the constraint.
 //
-//	checkVersionConstraint(t, "1.2.31",  ">= 1.2.0, < 2.0.0") - no error
-//	checkVersionConstraint(t, "1.0.31",  ">= 1.2.0, < 2.0.0") - error
-func checkVersionConstraint(actualVersionStr string, versionConstraintStr string) error {
+//	CheckVersionConstraint("1.2.31",  ">= 1.2.0, < 2.0.0") - no error
+//	CheckVersionConstraint("1.0.31",  ">= 1.2.0, < 2.0.0") - error
+func CheckVersionConstraint(actualVersionStr string, versionConstraintStr string) error {
 	actualVersion, err := version.NewVersion(actualVersionStr)
 	if err != nil {
-		return fmt.Errorf("invalid version format found for actualVersionStr: %s", actualVersionStr)
+		return &InvalidVersionFormatErr{Field: "actualVersionStr", Value: actualVersionStr, Underlying: err}
 	}
 
 	versionConstraint, err := version.NewConstraint(versionConstraintStr)
 	if err != nil {
-		return fmt.Errorf("invalid version format found for versionConstraint: %s", versionConstraintStr)
+		return &InvalidVersionFormatErr{Field: "versionConstraint", Value: versionConstraintStr, Underlying: err}
 	}
 
 	if !versionConstraint.Check(actualVersion) {
 		return &VersionMismatchErr{
-			errorMessage: fmt.Sprintf("actual version {%s} failed "+
-				"the version constraint {%s}", actualVersionStr, versionConstraint),
+			Actual:     actualVersionStr,
+			Constraint: versionConstraintStr,
 		}
-
 	}
 
 	return nil
