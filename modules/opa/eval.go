@@ -1,6 +1,9 @@
+// Package opa provides helpers for running Open Policy Agent (OPA) evaluations in automated tests.
 package opa
 
 import (
+	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -15,9 +18,6 @@ import (
 // EvalOptions defines options that can be passed to the 'opa eval' command for checking policies on arbitrary JSON data
 // via OPA.
 type EvalOptions struct {
-	// Whether OPA should run checks with failure.
-	FailMode FailMode
-
 	// Path to rego file containing the OPA rules. Can also be a remote path defined in go-getter syntax. Refer to
 	// https://github.com/hashicorp/go-getter#url-format for supported options.
 	RulePath string
@@ -30,6 +30,9 @@ type EvalOptions struct {
 	// Example: []string{"--v0-compatible"} to enable OPA v0 compatibility mode.
 	// Example: []string{"--strict"} to enable strict mode for the eval subcommand.
 	ExtraArgs []string
+
+	// Whether OPA should run checks with failure.
+	FailMode FailMode
 
 	// The following options can be used to change the behavior of the related functions for debuggability.
 
@@ -52,7 +55,7 @@ const (
 	NoFail
 )
 
-// EvalE runs `opa eval` on the given JSON files using the configured policy file and result query. Translates to:
+// Eval runs `opa eval` on the given JSON files using the configured policy file and result query. Translates to:
 //
 //	opa eval -i $JSONFile -d $RulePath $ResultQuery
 //
@@ -62,7 +65,8 @@ func Eval(t testing.TestingT, options *EvalOptions, jsonFilePaths []string, resu
 	require.NoError(t, EvalE(t, options, jsonFilePaths, resultQuery))
 }
 
-// EvalE runs `opa eval` on the given JSON files using the configured policy file and result query. Translates to:
+// EvalWithOutput runs `opa eval` on the given JSON files using the configured policy file and result query.
+// Translates to:
 //
 //	opa eval -i $JSONFile -d $RulePath $ResultQuery
 //
@@ -72,6 +76,7 @@ func Eval(t testing.TestingT, options *EvalOptions, jsonFilePaths []string, resu
 func EvalWithOutput(t testing.TestingT, options *EvalOptions, jsonFilePaths []string, resultQuery string) (outputs []string) {
 	outputs, err := EvalWithOutputE(t, options, jsonFilePaths, resultQuery)
 	require.NoError(t, err)
+
 	return
 }
 
@@ -82,6 +87,7 @@ func EvalWithOutput(t testing.TestingT, options *EvalOptions, jsonFilePaths []st
 // This will asynchronously run OPA on each file concurrently using goroutines.
 func EvalE(t testing.TestingT, options *EvalOptions, jsonFilePaths []string, resultQuery string) (err error) {
 	_, err = evalE(t, options, jsonFilePaths, resultQuery)
+
 	return
 }
 
@@ -98,14 +104,17 @@ func EvalWithOutputE(t testing.TestingT, options *EvalOptions, jsonFilePaths []s
 func evalE(t testing.TestingT, options *EvalOptions, jsonFilePaths []string, resultQuery string) (outputs []string, err error) {
 	downloadedPolicyPath, err := DownloadPolicyE(t, options.RulePath)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("downloading policy %s: %w", options.RulePath, err)
 	}
 
 	outputs = make([]string, len(jsonFilePaths))
 	wg := new(sync.WaitGroup)
 	wg.Add(len(jsonFilePaths))
+
 	errorsOccurred := new(multierror.Error)
+
 	errChans := make([]chan error, len(jsonFilePaths))
+
 	for i, jsonFilePath := range jsonFilePaths {
 		errChan := make(chan error, 1)
 		errChans[i] = errChan
@@ -114,13 +123,16 @@ func evalE(t testing.TestingT, options *EvalOptions, jsonFilePaths []string, res
 			outputs[i] = asyncEval(t, wg, errChan, options, downloadedPolicyPath, jsonFilePath, resultQuery)
 		}(i, jsonFilePath)
 	}
+
 	wg.Wait()
+
 	for _, errChan := range errChans {
 		err := <-errChan
 		if err != nil {
 			errorsOccurred = multierror.Append(errorsOccurred, err)
 		}
 	}
+
 	return outputs, errorsOccurred.ErrorOrNil()
 }
 
@@ -135,7 +147,8 @@ func asyncEval(
 	resultQuery string,
 ) (output string) {
 	defer wg.Done()
-	cmd := shell.Command{
+
+	cmd := &shell.Command{
 		Command: "opa",
 		Args:    formatOPAEvalArgs(options, downloadedPolicyPath, jsonFilePath, resultQuery),
 
@@ -143,19 +156,24 @@ func asyncEval(
 		// opa eval is typically very quick.
 		Logger: logger.Discard,
 	}
+
 	output, err := runCommandWithFullLoggingE(t, options.Logger, cmd)
+
 	ruleBasePath := filepath.Base(downloadedPolicyPath)
+
 	if err == nil {
 		options.Logger.Logf(t, "opa eval passed on file %s (policy %s; query %s)", jsonFilePath, ruleBasePath, resultQuery)
 	} else {
 		options.Logger.Logf(t, "Failed opa eval on file %s (policy %s; query %s)", jsonFilePath, ruleBasePath, resultQuery)
-		if options.DebugDisableQueryDataOnError == false {
+
+		if !options.DebugDisableQueryDataOnError {
 			options.Logger.Logf(t, "DEBUG: rerunning opa eval to query for full data.")
 			cmd.Args = formatOPAEvalArgs(options, downloadedPolicyPath, jsonFilePath, "data")
 			// We deliberately ignore the error here as we want to only return the original error.
 			output, _ = runCommandWithFullLoggingE(t, options.Logger, cmd)
 		}
 	}
+
 	errChan <- err
 
 	return
@@ -179,6 +197,8 @@ func formatOPAEvalArgs(options *EvalOptions, rulePath, jsonFilePath, resultQuery
 		args = append(args, "--fail")
 	case FailDefined:
 		args = append(args, "--fail-defined")
+	case NoFail:
+		// No additional flags needed.
 	}
 
 	args = append(
@@ -189,14 +209,16 @@ func formatOPAEvalArgs(options *EvalOptions, rulePath, jsonFilePath, resultQuery
 			resultQuery,
 		}...,
 	)
+
 	return args
 }
 
-// runCommandWithFullLogging will log the command output in its entirety with buffering. This avoids breaking up the
+// runCommandWithFullLoggingE will log the command output in its entirety with buffering. This avoids breaking up the
 // logs when commands are run concurrently. This is a private function used in the context of opa only because opa runs
 // very quickly, and the output of opa is hard to parse if it is broken up by interleaved logs.
-func runCommandWithFullLoggingE(t testing.TestingT, logger *logger.Logger, cmd shell.Command) (output string, err error) {
-	output, err = shell.RunCommandAndGetOutputE(t, cmd)
-	logger.Logf(t, "Output of command `%s %s`:\n%s", cmd.Command, strings.Join(cmd.Args, " "), output)
+func runCommandWithFullLoggingE(t testing.TestingT, lgr *logger.Logger, cmd *shell.Command) (output string, err error) {
+	output, err = shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
+	lgr.Logf(t, "Output of command `%s %s`:\n%s", cmd.Command, strings.Join(cmd.Args, " "), output)
+
 	return
 }

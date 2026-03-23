@@ -1,4 +1,4 @@
-package opa
+package opa_test
 
 import (
 	"os"
@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/gruntwork-io/terratest/modules/opa"
 )
 
 func TestFormatOPAEvalArgs(t *testing.T) {
@@ -13,7 +15,7 @@ func TestFormatOPAEvalArgs(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		options  *EvalOptions
+		options  *opa.EvalOptions
 		rulePath string
 		jsonFile string
 		query    string
@@ -21,8 +23,8 @@ func TestFormatOPAEvalArgs(t *testing.T) {
 	}{
 		{
 			name: "Basic args without extras",
-			options: &EvalOptions{
-				FailMode: NoFail,
+			options: &opa.EvalOptions{
+				FailMode: opa.NoFail,
 			},
 			rulePath: "/path/to/policy.rego",
 			jsonFile: "/path/to/input.json",
@@ -31,8 +33,8 @@ func TestFormatOPAEvalArgs(t *testing.T) {
 		},
 		{
 			name: "With fail mode",
-			options: &EvalOptions{
-				FailMode: FailUndefined,
+			options: &opa.EvalOptions{
+				FailMode: opa.FailUndefined,
 			},
 			rulePath: "/path/to/policy.rego",
 			jsonFile: "/path/to/input.json",
@@ -41,8 +43,8 @@ func TestFormatOPAEvalArgs(t *testing.T) {
 		},
 		{
 			name: "With extra args",
-			options: &EvalOptions{
-				FailMode:  FailUndefined,
+			options: &opa.EvalOptions{
+				FailMode:  opa.FailUndefined,
 				ExtraArgs: []string{"--format", "json"},
 			},
 			rulePath: "/path/to/policy.rego",
@@ -52,8 +54,8 @@ func TestFormatOPAEvalArgs(t *testing.T) {
 		},
 		{
 			name: "With v0-compatible flag",
-			options: &EvalOptions{
-				FailMode:  FailUndefined,
+			options: &opa.EvalOptions{
+				FailMode:  opa.FailUndefined,
 				ExtraArgs: []string{"--v0-compatible"},
 			},
 			rulePath: "/path/to/policy.rego",
@@ -63,8 +65,8 @@ func TestFormatOPAEvalArgs(t *testing.T) {
 		},
 		{
 			name: "With multiple extra args",
-			options: &EvalOptions{
-				FailMode:  FailUndefined,
+			options: &opa.EvalOptions{
+				FailMode:  opa.FailUndefined,
 				ExtraArgs: []string{"--v0-compatible", "--format", "json"},
 			},
 			rulePath: "/path/to/policy.rego",
@@ -75,10 +77,10 @@ func TestFormatOPAEvalArgs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			actual := formatOPAEvalArgs(test.options, test.rulePath, test.jsonFile, test.query)
+
+			actual := opa.FormatOPAEvalArgs(test.options, test.rulePath, test.jsonFile, test.query)
 			assert.Equal(t, test.expected, actual)
 		})
 	}
@@ -88,8 +90,7 @@ func TestEvalWithOutput(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-
+		name    string
 		policy  string
 		query   string
 		inputs  []string
@@ -195,34 +196,42 @@ func TestEvalWithOutput(t *testing.T) {
 	}
 
 	createTempFile := func(t *testing.T, name string, content string) string {
+		t.Helper()
+
 		f, err := os.CreateTemp(t.TempDir(), name)
 		require.NoError(t, err)
 		t.Cleanup(func() { os.Remove(f.Name()) })
+
 		_, err = f.WriteString(content)
 		require.NoError(t, err)
+
 		return f.Name()
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			policy := createTempFile(t, "policy-*.rego", test.policy)
+
 			inputs := make([]string, len(test.inputs))
+
 			for i, input := range test.inputs {
 				f := createTempFile(t, "inputs-*.json", input)
 				inputs[i] = f
 			}
 
-			options := &EvalOptions{
+			options := &opa.EvalOptions{
 				RulePath: policy,
 			}
 
-			outputs, err := EvalWithOutputE(t, options, inputs, test.query)
+			outputs, err := opa.EvalWithOutputE(t, options, inputs, test.query)
 			if test.isError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
+
 			for i, output := range test.outputs {
 				require.JSONEq(t, output, outputs[i], "output for input: %d", i)
 			}
