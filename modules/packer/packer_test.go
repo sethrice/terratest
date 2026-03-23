@@ -1,12 +1,12 @@
-package packer
+package packer_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/packer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,9 +15,9 @@ func TestExtractAmiIdFromOneLine(t *testing.T) {
 	t.Parallel()
 
 	expectedAMIID := "ami-b481b3de"
-	text := fmt.Sprintf("1456332887,amazon-ebs,artifact,0,id,us-east-1:%s", expectedAMIID)
-	actualAMIID, err := extractArtifactID(text)
+	text := "1456332887,amazon-ebs,artifact,0,id,us-east-1:" + expectedAMIID
 
+	actualAMIID, err := packer.ExtractArtifactID(text)
 	if err != nil {
 		t.Errorf("Did not expect to get an error when extracting a valid AMI ID: %s", err)
 	}
@@ -31,9 +31,9 @@ func TestExtractImageIdFromOneLine(t *testing.T) {
 	t.Parallel()
 
 	expectedImageID := "terratest-packer-example-2018-08-09t12-02-58z"
-	text := fmt.Sprintf("1533816302,googlecompute,artifact,0,id,%s", expectedImageID)
-	actualImageID, err := extractArtifactID(text)
+	text := "1533816302,googlecompute,artifact,0,id," + expectedImageID
 
+	actualImageID, err := packer.ExtractArtifactID(text)
 	if err != nil {
 		t.Errorf("Did not expect to get an error when extracting a valid Image ID: %s", err)
 	}
@@ -47,16 +47,15 @@ func TestExtractAmiIdFromMultipleLines(t *testing.T) {
 	t.Parallel()
 
 	expectedAMIID := "ami-b481b3de"
-	text := fmt.Sprintf(`
+	text := `
 	foo
 	bar
-	1456332887,amazon-ebs,artifact,0,id,us-east-1:%s
+	1456332887,amazon-ebs,artifact,0,id,us-east-1:` + expectedAMIID + `
 	baz
 	blah
-	`, expectedAMIID)
+	`
 
-	actualAMIID, err := extractArtifactID(text)
-
+	actualAMIID, err := packer.ExtractArtifactID(text)
 	if err != nil {
 		t.Errorf("Did not expect to get an error when extracting a valid AMI ID: %s", err)
 	}
@@ -70,16 +69,15 @@ func TestExtractImageIdFromMultipleLines(t *testing.T) {
 	t.Parallel()
 
 	expectedImageID := "terratest-packer-example-2018-08-09t12-02-58z"
-	text := fmt.Sprintf(`
+	text := `
 	foo
 	bar
-	1533816302,googlecompute,artifact,0,id,%s
+	1533816302,googlecompute,artifact,0,id,` + expectedImageID + `
 	baz
 	blah
-	`, expectedImageID)
+	`
 
-	actualImageID, err := extractArtifactID(text)
-
+	actualImageID, err := packer.ExtractArtifactID(text)
 	if err != nil {
 		t.Errorf("Did not expect to get an error when extracting a valid Image ID: %s", err)
 	}
@@ -99,12 +97,10 @@ func TestExtractAmiIdNoIdPresent(t *testing.T) {
 	blah
 	`
 
-	_, err := extractArtifactID(text)
-
+	_, err := packer.ExtractArtifactID(text)
 	if err == nil {
 		t.Error("Expected to get an error when extracting an AMI ID from text with no AMI in it, but got nil")
 	}
-
 }
 
 func TestExtractArtifactINoIdPresent(t *testing.T) {
@@ -117,8 +113,7 @@ func TestExtractArtifactINoIdPresent(t *testing.T) {
 	blah
 	`
 
-	_, err := extractArtifactID(text)
-
+	_, err := packer.ExtractArtifactID(text)
 	if err == nil {
 		t.Error("Expected to get an error when extracting an Artifact ID from text with no Artifact ID in it, but got nil")
 	}
@@ -128,17 +123,17 @@ func TestFormatPackerArgs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		option   *Options
+		option   *packer.Options
 		expected string
 	}{
 		{
-			option: &Options{
+			option: &packer.Options{
 				Template: "packer.json",
 			},
 			expected: "build -machine-readable packer.json",
 		},
 		{
-			option: &Options{
+			option: &packer.Options{
 				Template: "packer.json",
 				Vars: map[string]string{
 					"foo": "bar",
@@ -148,7 +143,7 @@ func TestFormatPackerArgs(t *testing.T) {
 			expected: "build -machine-readable -var foo=bar -only=onlythis packer.json",
 		},
 		{
-			option: &Options{
+			option: &packer.Options{
 				Template: "packer.json",
 				Vars: map[string]string{
 					"foo": "bar",
@@ -159,7 +154,7 @@ func TestFormatPackerArgs(t *testing.T) {
 			expected: "build -machine-readable -var foo=bar -only=onlythis -except=long-run-pp,artifact packer.json",
 		},
 		{
-			option: &Options{
+			option: &packer.Options{
 				Template: "packer.json",
 				Vars: map[string]string{
 					"foo": "bar",
@@ -173,8 +168,8 @@ func TestFormatPackerArgs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		args := formatPackerArgs(test.option)
-		assert.Equal(t, strings.Join(args, " "), test.expected)
+		args := packer.FormatPackerArgs(test.option)
+		assert.Equal(t, test.expected, strings.Join(args, " "))
 	}
 }
 
@@ -204,7 +199,9 @@ func TestTrimPackerVersion(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.versionOutput, func(t *testing.T) {
-			out := trimPackerVersion(test.versionOutput)
+			t.Parallel()
+
+			out := packer.TrimPackerVersion(test.versionOutput)
 			assert.Equal(t, test.expected, out)
 		})
 	}
@@ -244,19 +241,18 @@ func TestGetArtifactIDFromManifestBuildNameE(t *testing.T) {
 	t.Run("Found", func(t *testing.T) {
 		t.Parallel()
 
-		artifactID, err := GetArtifactIDFromManifestBuildNameE(t, manifestPath, "docker")
+		artifactID, err := packer.GetArtifactIDFromManifestBuildNameE(t, manifestPath, "docker")
 		require.NoError(t, err)
 		assert.Equal(t, "Container", artifactID)
 
-		artifactID2 := GetArtifactIDFromManifestBuildName(t, manifestPath, "docker")
+		artifactID2 := packer.GetArtifactIDFromManifestBuildName(t, manifestPath, "docker")
 		assert.Equal(t, "Container", artifactID2)
 	})
 
 	t.Run("Not Found", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := GetArtifactIDFromManifestBuildNameE(t, manifestPath, "notfound")
+		_, err := packer.GetArtifactIDFromManifestBuildNameE(t, manifestPath, "notfound")
 		require.Error(t, err)
 	})
-
 }
