@@ -1,6 +1,8 @@
+// Package database provides helper functions to connect to and interact with databases during automated tests.
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"testing"
@@ -24,7 +26,7 @@ const (
 	_mysqlConnStr         = "%s:%s@tcp(%s:%s)/%s?allowNativePasswords=true"
 )
 
-// DBConfig using server name, user name, password and database name
+// DBConfig using server name, user name, password and database name.
 type DBConfig struct {
 	Host     string
 	Port     string
@@ -33,18 +35,38 @@ type DBConfig struct {
 	Database string
 }
 
-// DBConnection connects to the database using database configuration and database type, i.e. mssql, and then return the database. If there's any error, fail the test.
-func DBConnection(t *testing.T, dbType string, dbConfig DBConfig) *sql.DB {
+// DBConnection connects to the database using database configuration and database type, i.e. mssql, and then returns
+// the database. If there's any error, fail the test.
+//
+// Deprecated: Use DBConnectionWithContextE instead.
+func DBConnection(t *testing.T, dbType string, dbConfig DBConfig) *sql.DB { //nolint:gocritic // Preserving original signature for backward compatibility.
+	t.Helper()
+
 	db, err := DBConnectionE(t, dbType, dbConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return db
 }
 
-// DBConnectionE connects to the database using database configuration and database type, i.e. mssql. Return the database or an error.
-func DBConnectionE(t *testing.T, dbType string, dbConfig DBConfig) (*sql.DB, error) {
-	config := ""
+// DBConnectionE connects to the database using database configuration and database type, i.e. mssql. Returns the
+// database or an error.
+//
+// Deprecated: Use DBConnectionWithContextE instead.
+func DBConnectionE(t *testing.T, dbType string, dbConfig DBConfig) (*sql.DB, error) { //nolint:gocritic // Preserving original signature for backward compatibility.
+	t.Helper()
+
+	return DBConnectionWithContextE(t, context.Background(), dbType, &dbConfig)
+}
+
+// DBConnectionWithContextE connects to the database using database configuration and database type, i.e. mssql.
+// Returns the database or an error.
+func DBConnectionWithContextE(t *testing.T, ctx context.Context, dbType string, dbConfig *DBConfig) (*sql.DB, error) {
+	t.Helper()
+
+	var config string
+
 	switch dbType {
 	case _databaseTypeMSSQL:
 		config = fmt.Sprintf(_mssqlConnStr, dbConfig.Host, dbConfig.Port, dbConfig.User, dbConfig.Password, dbConfig.Database)
@@ -55,62 +77,108 @@ func DBConnectionE(t *testing.T, dbType string, dbConfig DBConfig) (*sql.DB, err
 	default:
 		return nil, DBUnknown{dbType: dbType}
 	}
+
 	db, err := sql.Open(dbType, config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
-	err = db.Ping()
+
+	err = db.PingContext(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
+
 	return db, nil
 }
 
 // DBExecution executes specific SQL commands, i.e. insertion. If there's any error, fail the test.
+//
+// Deprecated: Use DBExecutionWithContextE instead.
 func DBExecution(t *testing.T, db *sql.DB, command string) {
+	t.Helper()
+
 	_, err := DBExecutionE(t, db, command)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-// DBExecutionE executes specific SQL commands, i.e. insertion. Return the result or an error.
+// DBExecutionE executes specific SQL commands, i.e. insertion. Returns the result or an error.
+//
+// Deprecated: Use DBExecutionWithContextE instead.
 func DBExecutionE(t *testing.T, db *sql.DB, command string) (sql.Result, error) {
-	result, err := db.Exec(command)
+	t.Helper()
+
+	return DBExecutionWithContextE(t, context.Background(), db, command)
+}
+
+// DBExecutionWithContextE executes specific SQL commands, i.e. insertion. Returns the result or an error.
+func DBExecutionWithContextE(t *testing.T, ctx context.Context, db *sql.DB, command string) (sql.Result, error) {
+	t.Helper()
+
+	result, err := db.ExecContext(ctx, command)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to execute database command: %w", err)
 	}
+
 	return result, nil
 }
 
-// DBQuery queries from database, i.e. selection, and then return the result. If there's any error, fail the test.
+// DBQuery queries from database, i.e. selection, and then returns the result. If there's any error, fail the test.
+//
+// Deprecated: Use DBQueryWithContextE instead.
 func DBQuery(t *testing.T, db *sql.DB, command string) *sql.Rows {
+	t.Helper()
+
 	rows, err := DBQueryE(t, db, command)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return rows
 }
 
-// DBQueryE queries from database, i.e. selection. Return the result or an error.
+// DBQueryE queries from database, i.e. selection. Returns the result or an error.
+//
+// Deprecated: Use DBQueryWithContextE instead.
 func DBQueryE(t *testing.T, db *sql.DB, command string) (*sql.Rows, error) {
-	rows, err := db.Query(command)
+	t.Helper()
+
+	return DBQueryWithContextE(t, context.Background(), db, command)
+}
+
+// DBQueryWithContextE queries from database, i.e. selection. Returns the result or an error.
+func DBQueryWithContextE(t *testing.T, ctx context.Context, db *sql.DB, command string) (*sql.Rows, error) {
+	t.Helper()
+
+	rows, err := db.QueryContext(ctx, command)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to execute database query: %w", err)
 	}
+
 	return rows, nil
 }
 
-// DBQueryWithValidation queries from database and validate whether the result is the same as expected text. If there's any error, fail the test.
+// DBQueryWithValidation queries from database and validates whether the result is the same as expected text. If
+// there's any error, fail the test.
+//
+// Deprecated: Use DBQueryWithCustomValidationWithContextE instead.
 func DBQueryWithValidation(t *testing.T, db *sql.DB, command string, expected string) {
+	t.Helper()
+
 	err := DBQueryWithValidationE(t, db, command, expected)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-// DBQueryWithValidationE queries from database and validate whether the result is the same as expected text. If not, return an error.
+// DBQueryWithValidationE queries from database and validates whether the result is the same as expected text. If not,
+// returns an error.
+//
+// Deprecated: Use DBQueryWithCustomValidationWithContextE instead.
 func DBQueryWithValidationE(t *testing.T, db *sql.DB, command string, expected string) error {
+	t.Helper()
+
 	return DBQueryWithCustomValidationE(t, db, command, func(rows *sql.Rows) bool {
 		var name string
 		for rows.Next() {
@@ -118,32 +186,63 @@ func DBQueryWithValidationE(t *testing.T, db *sql.DB, command string, expected s
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			if name != expected {
 				return false
 			}
 		}
+
 		return true
 	})
 }
 
-// DBQueryWithCustomValidation queries from database and validate whether the result meets the requirement. If there's any error, fail the test.
+// DBQueryWithCustomValidation queries from database and validates whether the result meets the requirement. If
+// there's any error, fail the test.
+//
+// Deprecated: Use DBQueryWithCustomValidationWithContextE instead.
 func DBQueryWithCustomValidation(t *testing.T, db *sql.DB, command string, validateResponse func(*sql.Rows) bool) {
+	t.Helper()
+
 	err := DBQueryWithCustomValidationE(t, db, command, validateResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-// DBQueryWithCustomValidationE queries from database and validate whether the result meets the requirement. If not, return an error.
+// DBQueryWithCustomValidationE queries from database and validates whether the result meets the requirement. If not,
+// returns an error.
+//
+// Deprecated: Use DBQueryWithCustomValidationWithContextE instead.
 func DBQueryWithCustomValidationE(t *testing.T, db *sql.DB, command string, validateResponse func(*sql.Rows) bool) error {
-	rows, err := DBQueryE(t, db, command)
+	t.Helper()
+
+	return DBQueryWithCustomValidationWithContextE(t, context.Background(), db, command, validateResponse)
+}
+
+// DBQueryWithCustomValidationWithContextE queries from database and validates whether the result meets the requirement.
+// If not, returns an error.
+func DBQueryWithCustomValidationWithContextE(t *testing.T, ctx context.Context, db *sql.DB, command string, validateResponse func(*sql.Rows) bool) error {
+	t.Helper()
+
+	rows, err := DBQueryWithContextE(t, ctx, db, command)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			t.Logf("failed to close database rows: %v", closeErr)
+		}
+	}()
+
 	if !validateResponse(rows) {
 		return ValidationFunctionFailed{command: command}
 	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error iterating database rows: %w", err)
+	}
+
 	return nil
 }
 
