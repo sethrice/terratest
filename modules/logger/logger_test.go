@@ -1,4 +1,4 @@
-package logger
+package logger_test
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/logger"
 	tftesting "github.com/gruntwork-io/terratest/modules/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,9 +18,10 @@ func TestDoLog(t *testing.T) {
 	t.Parallel()
 
 	text := "test-do-log"
+
 	var buffer bytes.Buffer
 
-	DoLog(t, 1, &buffer, text)
+	logger.DoLog(t, 1, &buffer, text)
 
 	assert.Regexp(t, fmt.Sprintf("^%s .+? [[:word:]]+.go:[0-9]+: %s$", t.Name(), text), strings.TrimSpace(buffer.String()))
 }
@@ -28,21 +30,22 @@ type customLogger struct {
 	logs []string
 }
 
-func (c *customLogger) Logf(t tftesting.TestingT, format string, args ...interface{}) {
+func (c *customLogger) Logf(_ tftesting.TestingT, format string, args ...any) {
 	c.logs = append(c.logs, fmt.Sprintf(format, args...))
 }
 
+//nolint:paralleltest // test verifies nil Logger behavior and uses subtests that interact with shared state
 func TestCustomLogger(t *testing.T) {
-	Logf(t, "this should be logged with the default logger")
+	logger.Logf(t, "this should be logged with the default logger")
 
-	var l *Logger
+	var l *logger.Logger
 	l.Logf(t, "this should be logged with the default logger too")
 
-	l = New(nil)
+	l = logger.New(nil)
 	l.Logf(t, "this should be logged with the default logger too!")
 
 	c := &customLogger{}
-	l = New(c)
+	l = logger.New(c)
 	l.Logf(t, "log output 1")
 	l.Logf(t, "log output 2")
 
@@ -56,39 +59,44 @@ func TestCustomLogger(t *testing.T) {
 	assert.Equal(t, "subtest log", c.logs[2])
 }
 
-// TestLockedLog make sure that Log and Logf which use stdout are thread-safe
+// TestLockedLog makes sure that Log and Logf which use stdout are thread-safe.
+//
+//nolint:paralleltest // test modifies os.Stdout
 func TestLockedLog(t *testing.T) {
-	// should not call t.Parallel() since we are modifying os.Stdout
 	stdout := os.Stdout
+
 	t.Cleanup(func() {
 		os.Stdout = stdout
 	})
 
 	data := []struct {
+		fn   func(string)
 		name string
-		fn   func(*testing.T, string)
 	}{
 		{
+			fn: func(s string) {
+				logger.Log(t, s)
+			},
 			name: "Log",
-			fn: func(t *testing.T, s string) {
-				Log(t, s)
-			}},
+		},
 		{
+			fn: func(s string) {
+				logger.Logf(t, "%s", s)
+			},
 			name: "Logf",
-			fn: func(t *testing.T, s string) {
-				Logf(t, "%s", s)
-			}},
+		},
 	}
 
 	for _, d := range data {
-		mutexStdout.Lock()
+		logger.MutexStdout.Lock()
 		str := "Logging something" + t.Name()
 
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 		ch := make(chan struct{})
+
 		go func() {
-			d.fn(t, str)
+			d.fn(str)
 			w.Close()
 			close(ch)
 		}()
@@ -99,10 +107,10 @@ func TestLockedLog(t *testing.T) {
 		default:
 		}
 
-		mutexStdout.Unlock()
+		logger.MutexStdout.Unlock()
+
 		b, err := io.ReadAll(r)
 		require.NoError(t, err, "log should be unlocked")
 		assert.Contains(t, string(b), str, "should contains logged string")
 	}
-
 }

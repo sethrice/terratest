@@ -1,4 +1,3 @@
-// Package logger/parser contains methods to parse and restructure log output from go testing and terratest
 package parser
 
 import (
@@ -13,20 +12,33 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// parserCount is the number of concurrent parsers spawned by SpawnParsers.
+const parserCount = 2
+
 // SpawnParsers will spawn the log parser and junit report parsers off of a single reader.
 func SpawnParsers(logger *logrus.Logger, reader io.Reader, outputDir string) {
 	forkedReader, forkedWriter := io.Pipe()
 	teedReader := io.TeeReader(reader, forkedWriter)
+
 	var waitForParsers sync.WaitGroup
-	waitForParsers.Add(2)
+
+	waitForParsers.Add(parserCount)
+
 	go func() {
 		// close pipe writer, because this section drains the tee reader indicating reader is done draining
-		defer forkedWriter.Close()
+		defer func() {
+			if err := forkedWriter.Close(); err != nil {
+				logger.Errorf("Error closing forked writer: %s", err)
+			}
+		}()
 		defer waitForParsers.Done()
+
 		parseAndStoreTestOutput(logger, teedReader, outputDir)
 	}()
+
 	go func() {
 		defer waitForParsers.Done()
+
 		report, err := junitparser.Parse(forkedReader, "")
 		if err == nil {
 			storeJunitReport(logger, outputDir, report)
@@ -34,6 +46,7 @@ func SpawnParsers(logger *logrus.Logger, reader io.Reader, outputDir string) {
 			logger.Errorf("Error parsing test output into junit report: %s", err)
 		}
 	}()
+
 	waitForParsers.Wait()
 }
 
@@ -45,54 +58,54 @@ var (
 	regexPanic   = regexp.MustCompile(`^panic:`)
 )
 
-// getIndent takes a line and returns the indent string
+// GetIndent takes a line and returns the indent string
 // Example:
 //
 //	in:  "    --- FAIL: TestSnafu"
 //	out: "    "
-func getIndent(data string) string {
+func GetIndent(data string) string {
 	re := regexp.MustCompile(`^\s+`)
-	indent := re.FindString(data)
-	return indent
+
+	return re.FindString(data)
 }
 
-// getTestNameFromResultLine takes a go testing result line and extracts out the test name
+// GetTestNameFromResultLine takes a go testing result line and extracts out the test name
 // Example:
 //
 //	in:  --- FAIL: TestSnafu
 //	out: TestSnafu
-func getTestNameFromResultLine(text string) string {
+func GetTestNameFromResultLine(text string) string {
 	m := regexResult.FindStringSubmatch(text)
 	return m[2]
 }
 
-// isResultLine checks if a line of text matches a test result (begins with "--- FAIL" or "--- PASS")
-func isResultLine(text string) bool {
+// IsResultLine checks if a line of text matches a test result (begins with "--- FAIL" or "--- PASS")
+func IsResultLine(text string) bool {
 	return regexResult.MatchString(text)
 }
 
-// getTestNameFromStatusLine takes a go testing status line and extracts out the test name
+// GetTestNameFromStatusLine takes a go testing status line and extracts out the test name
 // Example:
 //
 //	in:  === RUN  TestSnafu
 //	out: TestSnafu
-func getTestNameFromStatusLine(text string) string {
+func GetTestNameFromStatusLine(text string) string {
 	m := regexStatus.FindStringSubmatch(text)
 	return m[2]
 }
 
-// isStatusLine checks if a line of text matches a test status
-func isStatusLine(text string) bool {
+// IsStatusLine checks if a line of text matches a test status
+func IsStatusLine(text string) bool {
 	return regexStatus.MatchString(text)
 }
 
-// isSummaryLine checks if a line of text matches the test summary
-func isSummaryLine(text string) bool {
+// IsSummaryLine checks if a line of text matches the test summary
+func IsSummaryLine(text string) bool {
 	return regexSummary.MatchString(text)
 }
 
-// isPanicLine checks if a line of text matches a panic
-func isPanicLine(text string) bool {
+// IsPanicLine checks if a line of text matches a panic
+func IsPanicLine(text string) bool {
 	return regexPanic.MatchString(text)
 }
 
@@ -107,19 +120,22 @@ func parseAndStoreTestOutput(
 	outputDir string,
 ) {
 	logWriter := LogWriter{
-		lookup:    make(map[string]*os.File),
-		outputDir: outputDir,
+		Lookup:    make(map[string]*os.File),
+		OutputDir: outputDir,
 	}
-	defer logWriter.closeFiles(logger)
+	defer logWriter.CloseFiles(logger)
 
 	// Track some state that persists across lines
 	testResultMarkers := TestResultMarkerStack{}
 	previousTestName := ""
 
 	var err error
+
 	reader := bufio.NewReader(read)
+
 	for {
 		var data string
+
 		data, err = reader.ReadString('\n')
 		if len(data) == 0 && err == io.EOF {
 			break
@@ -129,22 +145,27 @@ func parseAndStoreTestOutput(
 
 		// separate block so that we do not overwrite the err variable that we need afterwards to check if we're done
 		{
-			indentLevel := len(getIndent(data))
+			indentLevel := len(GetIndent(data))
 			isIndented := indentLevel > 0
 
 			// Garbage collection of test result markers. Primary purpose is to detect when we dedent out, which can only be
 			// detected when we reach a dedented line.
-			testResultMarkers = testResultMarkers.removeDedentedTestResultMarkers(indentLevel)
+			testResultMarkers = testResultMarkers.RemoveDedentedTestResultMarkers(indentLevel)
 
 			// Handle each possible category of test lines
 			switch {
-			case isSummaryLine(data):
-				logWriter.writeLog(logger, "summary", data)
+			case IsSummaryLine(data):
+				if writeErr := logWriter.WriteLog(logger, "summary", data); writeErr != nil {
+					logger.Errorf("Error writing summary log: %s", writeErr)
+				}
 
-			case isStatusLine(data):
-				testName := getTestNameFromStatusLine(data)
+			case IsStatusLine(data):
+				testName := GetTestNameFromStatusLine(data)
 				previousTestName = testName
-				logWriter.writeLog(logger, testName, data)
+
+				if writeErr := logWriter.WriteLog(logger, testName, data); writeErr != nil {
+					logger.Errorf("Error writing log for test %s: %s", testName, writeErr)
+				}
 
 			case strings.HasPrefix(data, "Test"):
 				// Heuristic: `go test` will only execute test functions named `Test.*`, so we assume any line prefixed
@@ -154,26 +175,36 @@ func parseAndStoreTestOutput(
 				vals := strings.Split(data, " ")
 				testName := vals[0]
 				previousTestName = testName
-				logWriter.writeLog(logger, testName, data)
 
-			case isIndented && isResultLine(data):
-				// In a nested test result block, so collect the line into all the test results we have seen so far.
-				for _, marker := range testResultMarkers {
-					logWriter.writeLog(logger, marker.TestName, data)
+				if writeErr := logWriter.WriteLog(logger, testName, data); writeErr != nil {
+					logger.Errorf("Error writing log for test %s: %s", testName, writeErr)
 				}
 
-			case isPanicLine(data):
+			case isIndented && IsResultLine(data):
+				// In a nested test result block, so collect the line into all the test results we have seen so far.
+				for _, marker := range testResultMarkers {
+					if writeErr := logWriter.WriteLog(logger, marker.TestName, data); writeErr != nil {
+						logger.Errorf("Error writing log for test %s: %s", marker.TestName, writeErr)
+					}
+				}
+
+			case IsPanicLine(data):
 				// When panic, we want all subsequent nonstandard test lines to roll up to the summary
 				previousTestName = "summary"
-				logWriter.writeLog(logger, "summary", data)
 
-			case isResultLine(data):
+				if writeErr := logWriter.WriteLog(logger, "summary", data); writeErr != nil {
+					logger.Errorf("Error writing summary log: %s", writeErr)
+				}
+
+			case IsResultLine(data):
 				// We ignore result lines, because that is handled specially below.
 
 			case previousTestName != "":
 				// Base case: roll up to the previous test line, if it exists.
 				// Handles case where terratest log has entries with newlines in them.
-				logWriter.writeLog(logger, previousTestName, data)
+				if writeErr := logWriter.WriteLog(logger, previousTestName, data); writeErr != nil {
+					logger.Errorf("Error writing log for test %s: %s", previousTestName, writeErr)
+				}
 
 			default:
 				logger.Warnf("Found test line that does not match known cases: %s", data)
@@ -183,16 +214,22 @@ func parseAndStoreTestOutput(
 			// tests). For those result lines, we want it to roll up to the parent test, so we need to run the handler in
 			// the `isIndented` section. But for both root and indented result lines, we want to execute the following code,
 			// hence this special block.
-			if isResultLine(data) {
-				testName := getTestNameFromResultLine(data)
-				logWriter.writeLog(logger, testName, data)
-				logWriter.writeLog(logger, "summary", data)
+			if IsResultLine(data) {
+				testName := GetTestNameFromResultLine(data)
+
+				if writeErr := logWriter.WriteLog(logger, testName, data); writeErr != nil {
+					logger.Errorf("Error writing log for test %s: %s", testName, writeErr)
+				}
+
+				if writeErr := logWriter.WriteLog(logger, "summary", data); writeErr != nil {
+					logger.Errorf("Error writing summary log: %s", writeErr)
+				}
 
 				marker := TestResultMarker{
 					TestName:    testName,
 					IndentLevel: indentLevel,
 				}
-				testResultMarkers = testResultMarkers.push(marker)
+				testResultMarkers = testResultMarkers.Push(marker)
 			}
 		}
 
@@ -200,6 +237,7 @@ func parseAndStoreTestOutput(
 			break
 		}
 	}
+
 	if err != io.EOF {
 		logger.Fatalf("Error reading from Reader: %s", err)
 	}

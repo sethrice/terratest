@@ -1,8 +1,9 @@
-package parser
+package parser_test
 
 import (
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/logger/parser"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,39 +16,39 @@ func TestGetIndent(t *testing.T) {
 		out  string
 	}{
 		{
-			"BaseCase",
-			"    --- FAIL: TestSnafu",
-			"    ",
+			name: "BaseCase",
+			in:   "    --- FAIL: TestSnafu",
+			out:  "    ",
 		},
 		{
-			"NoIndent",
-			"--- FAIL: TestSnafu",
-			"",
+			name: "NoIndent",
+			in:   "--- FAIL: TestSnafu",
+			out:  "",
 		},
 		{
-			"EmptyString",
-			"",
-			"",
+			name: "EmptyString",
+			in:   "",
+			out:  "",
 		},
 		{
-			"Tabs",
-			"\t\t---FAIL: TestSnafu",
-			"\t\t",
+			name: "Tabs",
+			in:   "\t\t---FAIL: TestSnafu",
+			out:  "\t\t",
 		},
 		{
-			"MixTabSpace",
-			"\t    ---FAIL: TestSnafu",
-			"\t    ",
+			name: "MixTabSpace",
+			in:   "\t    ---FAIL: TestSnafu",
+			out:  "\t    ",
 		},
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(
 				t,
-				getIndent(testCase.in),
 				testCase.out,
+				parser.GetIndent(testCase.in),
 			)
 		})
 	}
@@ -62,34 +63,34 @@ func TestGetTestNameFromResultLine(t *testing.T) {
 		out  string
 	}{
 		{
-			"BaseCase",
-			"--- PASS: TestGetTestNameFromResultLine (0.00s)",
-			"TestGetTestNameFromResultLine",
+			name: "BaseCase",
+			in:   "--- PASS: TestGetTestNameFromResultLine (0.00s)",
+			out:  "TestGetTestNameFromResultLine",
 		},
 		{
-			"Indented",
-			"    --- PASS: TestGetTestNameFromResultLine/Indented (0.00s)",
-			"TestGetTestNameFromResultLine/Indented",
+			name: "Indented",
+			in:   "    --- PASS: TestGetTestNameFromResultLine/Indented (0.00s)",
+			out:  "TestGetTestNameFromResultLine/Indented",
 		},
 		{
-			"SpecialChars",
-			"    --- PASS: TestGetTestNameFromResultLine/SpecialChars---_FAIL (0.00s)",
-			"TestGetTestNameFromResultLine/SpecialChars---_FAIL",
+			name: "SpecialChars",
+			in:   "    --- PASS: TestGetTestNameFromResultLine/SpecialChars---_FAIL (0.00s)",
+			out:  "TestGetTestNameFromResultLine/SpecialChars---_FAIL",
 		},
 		{
-			"WhenFailed",
-			"--- FAIL: TestGetTestNameFromResultLine (0.00s)",
-			"TestGetTestNameFromResultLine",
+			name: "WhenFailed",
+			in:   "--- FAIL: TestGetTestNameFromResultLine (0.00s)",
+			out:  "TestGetTestNameFromResultLine",
 		},
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(
 				t,
-				getTestNameFromResultLine(testCase.in),
 				testCase.out,
+				parser.GetTestNameFromResultLine(testCase.in),
 			)
 		})
 	}
@@ -104,39 +105,39 @@ func TestIsResultLine(t *testing.T) {
 		out  bool
 	}{
 		{
-			"BaseCase",
-			"--- PASS: TestIsResultLine (0.00s)",
-			true,
+			name: "BaseCase",
+			in:   "--- PASS: TestIsResultLine (0.00s)",
+			out:  true,
 		},
 		{
-			"Indented",
-			"    --- PASS: TestIsResultLine/Indented (0.00s)",
-			true,
+			name: "Indented",
+			in:   "    --- PASS: TestIsResultLine/Indented (0.00s)",
+			out:  true,
 		},
 		{
-			"SpecialChars",
-			"    --- PASS: TestIsResultLine/SpecialChars---_FAIL (0.00s)",
-			true,
+			name: "SpecialChars",
+			in:   "    --- PASS: TestIsResultLine/SpecialChars---_FAIL (0.00s)",
+			out:  true,
 		},
 		{
-			"WhenFailed",
-			"--- FAIL: TestIsResultLine (0.00s)",
-			true,
+			name: "WhenFailed",
+			in:   "--- FAIL: TestIsResultLine (0.00s)",
+			out:  true,
 		},
 		{
-			"NonResultLine",
-			"=== RUN TestIsResultLine",
-			false,
+			name: "NonResultLine",
+			in:   "=== RUN TestIsResultLine",
+			out:  false,
 		},
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(
 				t,
-				isResultLine(testCase.in),
 				testCase.out,
+				parser.IsResultLine(testCase.in),
 			)
 		})
 	}
@@ -151,39 +152,39 @@ func TestGetTestNameFromStatusLine(t *testing.T) {
 		out  string
 	}{
 		{
-			"BaseCase",
-			"=== RUN   TestGetTestNameFromStatusLine",
-			"TestGetTestNameFromStatusLine",
+			name: "BaseCase",
+			in:   "=== RUN   TestGetTestNameFromStatusLine",
+			out:  "TestGetTestNameFromStatusLine",
 		},
 		{
-			"Indented",
-			"    === RUN   TestGetTestNameFromStatusLine/Indented",
-			"TestGetTestNameFromStatusLine/Indented",
+			name: "Indented",
+			in:   "    === RUN   TestGetTestNameFromStatusLine/Indented",
+			out:  "TestGetTestNameFromStatusLine/Indented",
 		},
 		{
-			"SpecialChars",
-			"=== RUN   TestGetTestNameFromStatusLine/SpecialChars---_FAIL",
-			"TestGetTestNameFromStatusLine/SpecialChars---_FAIL",
+			name: "SpecialChars",
+			in:   "=== RUN   TestGetTestNameFromStatusLine/SpecialChars---_FAIL",
+			out:  "TestGetTestNameFromStatusLine/SpecialChars---_FAIL",
 		},
 		{
-			"WhenPaused",
-			"=== PAUSE TestGetTestNameFromStatusLine",
-			"TestGetTestNameFromStatusLine",
+			name: "WhenPaused",
+			in:   "=== PAUSE TestGetTestNameFromStatusLine",
+			out:  "TestGetTestNameFromStatusLine",
 		},
 		{
-			"WhenCont",
-			"=== CONT  TestGetTestNameFromStatusLine",
-			"TestGetTestNameFromStatusLine",
+			name: "WhenCont",
+			in:   "=== CONT  TestGetTestNameFromStatusLine",
+			out:  "TestGetTestNameFromStatusLine",
 		},
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(
 				t,
-				getTestNameFromStatusLine(testCase.in),
 				testCase.out,
+				parser.GetTestNameFromStatusLine(testCase.in),
 			)
 		})
 	}
@@ -198,44 +199,44 @@ func TestIsStatusLine(t *testing.T) {
 		out  bool
 	}{
 		{
-			"BaseCase",
-			"=== RUN   TestGetTestNameFromStatusLine",
-			true,
+			name: "BaseCase",
+			in:   "=== RUN   TestGetTestNameFromStatusLine",
+			out:  true,
 		},
 		{
-			"Indented",
-			"    === RUN   TestGetTestNameFromStatusLine/Indented",
-			true,
+			name: "Indented",
+			in:   "    === RUN   TestGetTestNameFromStatusLine/Indented",
+			out:  true,
 		},
 		{
-			"SpecialChars",
-			"=== RUN   TestGetTestNameFromStatusLine/SpecialChars---_FAIL",
-			true,
+			name: "SpecialChars",
+			in:   "=== RUN   TestGetTestNameFromStatusLine/SpecialChars---_FAIL",
+			out:  true,
 		},
 		{
-			"WhenPaused",
-			"=== PAUSE TestGetTestNameFromStatusLine",
-			true,
+			name: "WhenPaused",
+			in:   "=== PAUSE TestGetTestNameFromStatusLine",
+			out:  true,
 		},
 		{
-			"WhenCont",
-			"=== CONT  TestGetTestNameFromStatusLine",
-			true,
+			name: "WhenCont",
+			in:   "=== CONT  TestGetTestNameFromStatusLine",
+			out:  true,
 		},
 		{
-			"NonStatusLine",
-			"--- FAIL: TestIsStatusLine",
-			false,
+			name: "NonStatusLine",
+			in:   "--- FAIL: TestIsStatusLine",
+			out:  false,
 		},
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(
 				t,
-				isStatusLine(testCase.in),
 				testCase.out,
+				parser.IsStatusLine(testCase.in),
 			)
 		})
 	}
@@ -250,24 +251,24 @@ func TestIsSummaryLine(t *testing.T) {
 		out  bool
 	}{
 		{
-			"BaseCase",
-			"ok  	github.com/gruntwork-io/terratest/test	812.034s",
-			true,
+			name: "BaseCase",
+			in:   "ok  	github.com/gruntwork-io/terratest/test	812.034s",
+			out:  true,
 		},
 		{
-			"NotSummary",
-			"--- FAIL: TestIsStatusLine",
-			false,
+			name: "NotSummary",
+			in:   "--- FAIL: TestIsStatusLine",
+			out:  false,
 		},
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(
 				t,
-				isSummaryLine(testCase.in),
 				testCase.out,
+				parser.IsSummaryLine(testCase.in),
 			)
 		})
 	}
@@ -282,24 +283,24 @@ func TestIsPanicLine(t *testing.T) {
 		out  bool
 	}{
 		{
-			"BaseCase",
-			"panic: error [recovered]",
-			true,
+			name: "BaseCase",
+			in:   "panic: error [recovered]",
+			out:  true,
 		},
 		{
-			"NotPanic",
-			"--- FAIL: TestIsStatusLine",
-			false,
+			name: "NotPanic",
+			in:   "--- FAIL: TestIsStatusLine",
+			out:  false,
 		},
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(
 				t,
-				isPanicLine(testCase.in),
 				testCase.out,
+				parser.IsPanicLine(testCase.in),
 			)
 		})
 	}

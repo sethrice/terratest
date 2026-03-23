@@ -1,125 +1,130 @@
-package parser
+package parser_test
 
 import (
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/logger/parser"
 	"github.com/stretchr/testify/assert"
 )
 
-func createTestStack() TestResultMarkerStack {
-	return TestResultMarkerStack{
-		TestResultMarker{
+func createTestStack() parser.TestResultMarkerStack {
+	return parser.TestResultMarkerStack{
+		{
 			TestName:    "TestSnafu",
 			IndentLevel: 0,
 		},
-		TestResultMarker{
+		{
 			TestName:    "TestSnafu/Situation",
 			IndentLevel: 4,
 		},
-		TestResultMarker{
+		{
 			TestName:    "TestSnafu/Normal",
 			IndentLevel: 4,
 		},
 	}
 }
 
-// Test that pushing items to the stack appends to the list
+// TestStackPush tests that pushing items to the stack appends to the list.
 func TestStackPush(t *testing.T) {
 	t.Parallel()
 
 	markers := createTestStack()
-	newMarker := TestResultMarker{
+	newMarker := parser.TestResultMarker{
 		TestName:    "TestThatEverythingWorks",
 		IndentLevel: 0,
 	}
-	markers = markers.push(newMarker)
-	assert.Equal(t, len(markers), 4)
-	assert.Equal(t, markers[3], newMarker)
+	markers = markers.Push(newMarker)
+	assert.Len(t, markers, 4)
+	assert.Equal(t, newMarker, markers[3])
 }
 
-// Test that popping items off the stack will remove it from the stack and return the LAST item in list
+// TestStackPop tests that popping items off the stack will remove and return the LAST item.
 func TestStackPop(t *testing.T) {
 	t.Parallel()
 
 	originalMarkers := createTestStack()
 	markers := createTestStack()
-	markers, poppedMarker := markers.pop()
-	assert.Equal(t, poppedMarker, originalMarkers[2])
-	assert.Equal(t, len(markers), 2)
-	markers, poppedMarker = markers.pop()
-	assert.Equal(t, poppedMarker, originalMarkers[1])
-	assert.Equal(t, len(markers), 1)
-	markers, poppedMarker = markers.pop()
-	assert.Equal(t, poppedMarker, originalMarkers[0])
-	assert.Equal(t, len(markers), 0)
+
+	markers, poppedMarker := markers.Pop()
+	assert.Equal(t, originalMarkers[2], poppedMarker)
+	assert.Len(t, markers, 2)
+
+	markers, poppedMarker = markers.Pop()
+	assert.Equal(t, originalMarkers[1], poppedMarker)
+	assert.Len(t, markers, 1)
+
+	markers, poppedMarker = markers.Pop()
+	assert.Equal(t, originalMarkers[0], poppedMarker)
+	assert.Empty(t, markers)
 }
 
-// Test that popping item off an empty stack will return an empty TestResultMarker
+// TestStackPopEmpty tests that popping item off an empty stack returns an empty TestResultMarker.
 func TestStackPopEmpty(t *testing.T) {
 	t.Parallel()
 
-	markers := TestResultMarkerStack{}
-	markers, poppedMarker := markers.pop()
-	assert.Equal(t, len(markers), 0)
-	assert.Equal(t, poppedMarker, NULL_TEST_RESULT_MARKER)
+	markers := parser.TestResultMarkerStack{}
+
+	markers, poppedMarker := markers.Pop()
+	assert.Empty(t, markers)
+	assert.Equal(t, parser.NullTestResultMarker, poppedMarker)
 }
 
-// Test that peek will return the LAST item in the list WITHOUT removing it.
+// TestPeek tests that peek returns the LAST item in the list WITHOUT removing it.
 func TestPeek(t *testing.T) {
 	t.Parallel()
 
 	originalMarkers := createTestStack()
 	markers := createTestStack()
-	peekedMarker := markers.peek()
-	assert.Equal(t, peekedMarker, originalMarkers[2])
+	peekedMarker := markers.Peek()
+	assert.Equal(t, originalMarkers[2], peekedMarker)
 	assert.Equal(t, originalMarkers, markers)
 }
 
-// Test that peeking an empty stack will return an empty TestResultMarker
+// TestPeekEmpty tests that peeking an empty stack returns an empty TestResultMarker.
 func TestPeekEmpty(t *testing.T) {
 	t.Parallel()
 
-	markers := TestResultMarkerStack{}
-	peekedMarker := markers.peek()
-	assert.Equal(t, len(markers), 0)
-	assert.Equal(t, peekedMarker, NULL_TEST_RESULT_MARKER)
+	markers := parser.TestResultMarkerStack{}
+	peekedMarker := markers.Peek()
+	assert.Empty(t, markers)
+	assert.Equal(t, parser.NullTestResultMarker, peekedMarker)
 }
 
-// Test isEmpty only returns True on empty stack
+// TestIsEmpty tests that IsEmpty only returns true on empty stack.
 func TestIsEmpty(t *testing.T) {
 	t.Parallel()
 
-	emptyMarkerStack := TestResultMarkerStack{}
+	emptyMarkerStack := parser.TestResultMarkerStack{}
 	fullMarkerStack := createTestStack()
-	assert.True(t, emptyMarkerStack.isEmpty())
-	assert.False(t, fullMarkerStack.isEmpty())
+
+	assert.True(t, emptyMarkerStack.IsEmpty())
+	assert.False(t, fullMarkerStack.IsEmpty())
 }
 
-// Test that removeDedentedTestResultMarkers remove items that are dedented from the current level, assuming the stack
-// is ordered by indent level.
+// TestRemoveDedentedTestResultMarkers tests that items dedented from the current level are removed.
 func TestRemoveDedentedTestResultMarkers(t *testing.T) {
 	t.Parallel()
 
 	originalMarkers := createTestStack()
-	newMarkers := originalMarkers.removeDedentedTestResultMarkers(2)
-	assert.Equal(t, len(newMarkers), 1)
+	newMarkers := originalMarkers.RemoveDedentedTestResultMarkers(2)
+	assert.Len(t, newMarkers, 1)
 	assert.Equal(t, newMarkers, originalMarkers[:1])
 }
 
-// Test that removeDedentedTestResultMarkers handles empty stack.
+// TestRemoveDedentedTestResultMarkersEmpty tests that RemoveDedentedTestResultMarkers handles empty stack.
 func TestRemoveDedentedTestResultMarkersEmpty(t *testing.T) {
 	t.Parallel()
 
-	originalMarkers := TestResultMarkerStack{}
-	newMarkers := originalMarkers.removeDedentedTestResultMarkers(2)
-	assert.Equal(t, len(newMarkers), 0)
+	originalMarkers := parser.TestResultMarkerStack{}
+	newMarkers := originalMarkers.RemoveDedentedTestResultMarkers(2)
+	assert.Empty(t, newMarkers)
 }
 
-// Test that removeDedentedTestResultMarkers handles removing everything
+// TestRemoveDedentedTestResultMarkersAll tests that RemoveDedentedTestResultMarkers handles removing everything.
 func TestRemoveDedentedTestResultMarkersAll(t *testing.T) {
 	t.Parallel()
 
-	originalMarkers := TestResultMarkerStack{}
-	newMarkers := originalMarkers.removeDedentedTestResultMarkers(-1)
-	assert.Equal(t, len(newMarkers), 0)
+	originalMarkers := parser.TestResultMarkerStack{}
+	newMarkers := originalMarkers.RemoveDedentedTestResultMarkers(-1)
+	assert.Empty(t, newMarkers)
 }
