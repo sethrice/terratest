@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"context"
+
 	"github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/shell"
 	"github.com/gruntwork-io/terratest/modules/testing"
@@ -9,21 +11,11 @@ import (
 
 // RunOptions defines options that can be passed to the 'docker run' command.
 type RunOptions struct {
-	// Override the default COMMAND of the Docker image
-	Command []string
-
-	// If set to true, pass the --detach flag to 'docker run' to run the container in the background
-	Detach bool
+	// Set a logger that should be used. See the logger package for more info.
+	Logger *logger.Logger
 
 	// Override the default ENTRYPOINT of the Docker image
 	Entrypoint string
-
-	// Set environment variables
-	EnvironmentVariables []string
-
-	// If set to true, pass the --init flag to 'docker run' to run an init inside the container that forwards signals
-	// and reaps processes
-	Init bool
 
 	// Assign a name to the container
 	Name string
@@ -31,17 +23,14 @@ type RunOptions struct {
 	// Set platform
 	Platform string
 
-	// If set to true, pass the --privileged flag to 'docker run' to give extended privileges to the container
-	Privileged bool
-
-	// If set to true, pass the --rm flag to 'docker run' to automatically remove the container when it exits
-	Remove bool
-
-	// If set to true, pass the -tty flag to 'docker run' to allocate a pseudo-TTY
-	Tty bool
-
 	// Username or UID
 	User string
+
+	// Override the default COMMAND of the Docker image
+	Command []string
+
+	// Set environment variables
+	EnvironmentVariables []string
 
 	// Bind mount these volume(s) when running the container
 	Volumes []string
@@ -51,8 +40,21 @@ type RunOptions struct {
 	// solely focus on the most important ones.
 	OtherOptions []string
 
-	// Set a logger that should be used. See the logger package for more info.
-	Logger *logger.Logger
+	// If set to true, pass the --detach flag to 'docker run' to run the container in the background
+	Detach bool
+
+	// If set to true, pass the --init flag to 'docker run' to run an init inside the container that forwards signals
+	// and reaps processes
+	Init bool
+
+	// If set to true, pass the --privileged flag to 'docker run' to give extended privileges to the container
+	Privileged bool
+
+	// If set to true, pass the --rm flag to 'docker run' to automatically remove the container when it exits
+	Remove bool
+
+	// If set to true, pass the -tty flag to 'docker run' to allocate a pseudo-TTY
+	Tty bool
 }
 
 // Run runs the 'docker run' command on the given image with the given options and return stdout/stderr. This method
@@ -60,6 +62,7 @@ type RunOptions struct {
 func Run(t testing.TestingT, image string, options *RunOptions) string {
 	out, err := RunE(t, image, options)
 	require.NoError(t, err)
+
 	return out
 }
 
@@ -67,18 +70,15 @@ func Run(t testing.TestingT, image string, options *RunOptions) string {
 func RunE(t testing.TestingT, image string, options *RunOptions) (string, error) {
 	options.Logger.Logf(t, "Running 'docker run' on image '%s'", image)
 
-	args, err := formatDockerRunArgs(image, options)
-	if err != nil {
-		return "", err
-	}
+	args := formatDockerRunArgs(image, options)
 
-	cmd := shell.Command{
+	cmd := &shell.Command{
 		Command: "docker",
 		Args:    args,
 		Logger:  options.Logger,
 	}
 
-	return shell.RunCommandAndGetOutputE(t, cmd)
+	return shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
 }
 
 // RunAndGetID runs the 'docker run' command on the given image with the given options and returns the container ID
@@ -86,6 +86,7 @@ func RunE(t testing.TestingT, image string, options *RunOptions) (string, error)
 func RunAndGetID(t testing.TestingT, image string, options *RunOptions) string {
 	out, err := RunAndGetIDE(t, image, options)
 	require.NoError(t, err)
+
 	return out
 }
 
@@ -94,22 +95,19 @@ func RunAndGetID(t testing.TestingT, image string, options *RunOptions) string {
 func RunAndGetIDE(t testing.TestingT, image string, options *RunOptions) (string, error) {
 	options.Logger.Logf(t, "Running 'docker run' on image '%s', returning stdout", image)
 
-	args, err := formatDockerRunArgs(image, options)
-	if err != nil {
-		return "", err
-	}
+	args := formatDockerRunArgs(image, options)
 
-	cmd := shell.Command{
+	cmd := &shell.Command{
 		Command: "docker",
 		Args:    args,
 		Logger:  options.Logger,
 	}
 
-	return shell.RunCommandAndGetStdOutE(t, cmd)
+	return shell.RunCommandContextAndGetStdOutE(t, context.Background(), cmd)
 }
 
 // formatDockerRunArgs formats the arguments for the 'docker run' command.
-func formatDockerRunArgs(image string, options *RunOptions) ([]string, error) {
+func formatDockerRunArgs(image string, options *RunOptions) []string {
 	args := []string{"run"}
 
 	if options.Detach {
@@ -157,10 +155,8 @@ func formatDockerRunArgs(image string, options *RunOptions) ([]string, error) {
 	}
 
 	args = append(args, options.OtherOptions...)
-
 	args = append(args, image)
-
 	args = append(args, options.Command...)
 
-	return args, nil
+	return args
 }

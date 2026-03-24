@@ -1,8 +1,9 @@
-package docker
+package docker_test
 
 import (
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/docker"
 	"github.com/stretchr/testify/require"
 )
 
@@ -10,7 +11,7 @@ func TestDockerComposeWithBuildKit(t *testing.T) {
 	t.Parallel()
 
 	testToken := "testToken"
-	dockerOptions := &Options{
+	dockerOptions := &docker.Options{
 		// Directory where docker-compose.yml lives
 		WorkingDir: "../../test/fixtures/docker-compose-with-buildkit",
 
@@ -20,8 +21,8 @@ func TestDockerComposeWithBuildKit(t *testing.T) {
 		},
 		EnableBuildKit: true,
 	}
-	out := RunDockerCompose(t, dockerOptions, "build", "--no-cache")
-	out = RunDockerCompose(t, dockerOptions, "up")
+	docker.RunDockerCompose(t, dockerOptions, "build", "--no-cache")
+	out := docker.RunDockerCompose(t, dockerOptions, "up")
 
 	require.Contains(t, out, testToken)
 }
@@ -31,19 +32,19 @@ func TestDockerComposeWithCustomProjectName(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		options  *Options
+		options  *docker.Options
 		expected string
 	}{
 		{
 			name: "Testing ",
-			options: &Options{
+			options: &docker.Options{
 				WorkingDir: "../../test/fixtures/docker-compose-with-custom-project-name",
 			},
 			expected: "testdockercomposewithcustomprojectname",
 		},
 		{
 			name: "Testing",
-			options: &Options{
+			options: &docker.Options{
 				WorkingDir:  "../../test/fixtures/docker-compose-with-custom-project-name",
 				ProjectName: "testingProjectName",
 			},
@@ -53,10 +54,11 @@ func TestDockerComposeWithCustomProjectName(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			t.Log(test.name)
 
-			output := RunDockerCompose(t, test.options, "up", "-d")
-			defer RunDockerCompose(t, test.options, "down", "--remove-orphans", "--timeout", "2")
+			output := docker.RunDockerCompose(t, test.options, "up", "-d")
+			defer docker.RunDockerCompose(t, test.options, "down", "--remove-orphans", "--timeout", "2")
 
 			require.Contains(t, output, test.expected)
 		})

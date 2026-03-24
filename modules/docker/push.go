@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"context"
+
 	"github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/shell"
 	"github.com/gruntwork-io/terratest/modules/testing"
@@ -16,10 +18,11 @@ func Push(t testing.TestingT, logger *logger.Logger, tag string) {
 func PushE(t testing.TestingT, logger *logger.Logger, tag string) error {
 	logger.Logf(t, "Running 'docker push' for tag %s", tag)
 
-	cmd := shell.Command{
+	cmd := &shell.Command{
 		Command: "docker",
 		Args:    []string{"push", tag},
 		Logger:  logger,
 	}
-	return shell.RunCommandE(t, cmd)
+
+	return shell.RunCommandContextE(t, context.Background(), cmd)
 }

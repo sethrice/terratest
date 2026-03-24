@@ -1,10 +1,12 @@
-package docker
+package docker_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/gruntwork-io/terratest/modules/docker"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/gruntwork-io/terratest/modules/shell"
 	"github.com/stretchr/testify/require"
@@ -16,23 +18,23 @@ func TestInspect(t *testing.T) {
 	t.Parallel()
 
 	// append timestamp to container name to allow running tests in parallel
-	name := "inspect-test-" + random.UniqueId()
+	name := "inspect-test-" + random.UniqueID()
 
 	// running the container detached to allow inspection while it is running
-	options := &RunOptions{
+	options := &docker.RunOptions{
 		Detach: true,
 		Name:   name,
 	}
 
-	id := RunAndGetID(t, dockerInspectTestImage, options)
+	id := docker.RunAndGetID(t, dockerInspectTestImage, options)
 	defer removeContainer(t, id)
 
-	c := Inspect(t, id)
+	c := docker.Inspect(t, id)
 
 	require.Equal(t, id, c.ID)
 	require.Equal(t, name, c.Name)
 	require.IsType(t, time.Time{}, c.Created)
-	require.Equal(t, true, c.Running)
+	require.True(t, c.Running)
 }
 
 func TestInspectWithExposedPort(t *testing.T) {
@@ -41,15 +43,15 @@ func TestInspectWithExposedPort(t *testing.T) {
 	// choosing an unique high port to avoid conflict on test machines
 	port := 13031
 
-	options := &RunOptions{
+	options := &docker.RunOptions{
 		Detach:       true,
 		OtherOptions: []string{fmt.Sprintf("-p=%d:80", port)},
 	}
 
-	id := RunAndGetID(t, dockerInspectTestImage, options)
+	id := docker.RunAndGetID(t, dockerInspectTestImage, options)
 	defer removeContainer(t, id)
 
-	c := Inspect(t, id)
+	c := docker.Inspect(t, id)
 
 	require.NotEmptyf(t, c.Ports, "Container's exposed ports should not be empty")
 	require.EqualValues(t, 80, c.Ports[0].ContainerPort)
@@ -60,20 +62,22 @@ func TestInspectWithRandomExposedPort(t *testing.T) {
 	t.Parallel()
 
 	var expectedPort uint16 = 80
+
 	var unexpectedPort uint16 = 1234
-	options := &RunOptions{
+
+	options := &docker.RunOptions{
 		Detach:       true,
 		OtherOptions: []string{"-P"},
 	}
 
-	id := RunAndGetID(t, dockerInspectTestImage, options)
+	id := docker.RunAndGetID(t, dockerInspectTestImage, options)
 	defer removeContainer(t, id)
 
-	c := Inspect(t, id)
+	c := docker.Inspect(t, id)
 
 	require.NotEmptyf(t, c.Ports, "Container's exposed ports should not be empty")
-	require.NotEqualf(t, uint16(0), c.GetExposedHostPort(expectedPort), fmt.Sprintf("There are no exposed port %d!", expectedPort))
-	require.Equalf(t, uint16(0), c.GetExposedHostPort(unexpectedPort), fmt.Sprintf("There is an unexpected exposed port %d!", unexpectedPort))
+	require.NotEqualf(t, uint16(0), c.GetExposedHostPort(expectedPort), "There are no exposed port %d!", expectedPort)
+	require.Equalf(t, uint16(0), c.GetExposedHostPort(unexpectedPort), "There is an unexpected exposed port %d!", unexpectedPort)
 }
 
 func TestInspectWithHostVolume(t *testing.T) {
@@ -107,14 +111,14 @@ func TestInspectWithNamedVolume(t *testing.T) {
 func TestInspectWithInvalidContainerID(t *testing.T) {
 	t.Parallel()
 
-	_, err := InspectE(t, "This is not a valid container ID")
+	_, err := docker.InspectE(t, "This is not a valid container ID")
 	require.Error(t, err)
 }
 
 func TestInspectWithUnknownContainerID(t *testing.T) {
 	t.Parallel()
 
-	_, err := InspectE(t, "abcde123456")
+	_, err := docker.InspectE(t, "abcde123456")
 	require.Error(t, err)
 }
 
@@ -140,12 +144,14 @@ func TestInspectReturnsCorrectHealthCheckWhenUnhealthy(t *testing.T) {
 	require.Equal(t, "/bin/sh: service nginx status: not found\n", c.Health.Log[0].Output)
 }
 
-func runWithHealthCheck(t *testing.T, check string, frequency time.Duration, delay time.Duration) *ContainerInspect {
+func runWithHealthCheck(t *testing.T, check string, frequency time.Duration, delay time.Duration) *docker.ContainerInspect {
+	t.Helper()
+
 	// append timestamp to container name to allow running tests in parallel
-	name := "inspect-test-" + random.UniqueId()
+	name := "inspect-test-" + random.UniqueID()
 
 	// running the container detached to allow inspection while it is running
-	options := &RunOptions{
+	options := &docker.RunOptions{
 		Detach: true,
 		Name:   name,
 		OtherOptions: []string{
@@ -154,31 +160,35 @@ func runWithHealthCheck(t *testing.T, check string, frequency time.Duration, del
 		},
 	}
 
-	id := RunAndGetID(t, dockerInspectTestImage, options)
+	id := docker.RunAndGetID(t, dockerInspectTestImage, options)
 	defer removeContainer(t, id)
 
 	time.Sleep(delay)
 
-	return Inspect(t, id)
+	return docker.Inspect(t, id)
 }
 
-func runWithVolume(t *testing.T, volume string) *ContainerInspect {
-	options := &RunOptions{
+func runWithVolume(t *testing.T, volume string) *docker.ContainerInspect {
+	t.Helper()
+
+	options := &docker.RunOptions{
 		Detach:  true,
 		Volumes: []string{volume},
 	}
 
-	id := RunAndGetID(t, dockerInspectTestImage, options)
+	id := docker.RunAndGetID(t, dockerInspectTestImage, options)
 	defer removeContainer(t, id)
 
-	return Inspect(t, id)
+	return docker.Inspect(t, id)
 }
 
 func removeContainer(t *testing.T, id string) {
-	cmd := shell.Command{
+	t.Helper()
+
+	cmd := &shell.Command{
 		Command: "docker",
 		Args:    []string{"container", "rm", "--force", id},
 	}
 
-	shell.RunCommand(t, cmd)
+	shell.RunCommandContext(t, context.Background(), cmd)
 }

@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/gruntwork-io/terratest/modules/logger"
@@ -11,11 +12,11 @@ import (
 
 // StopOptions defines the options that can be passed to the 'docker stop' command
 type StopOptions struct {
-	// Seconds to wait for stop before killing the container (default 10)
-	Time int
-
 	// Set a logger that should be used. See the logger package for more info.
 	Logger *logger.Logger
+
+	// Seconds to wait for stop before killing the container (default 10)
+	Time int
 }
 
 // Stop runs the 'docker stop' command for the given containers and return the stdout/stderr. This method fails
@@ -23,6 +24,7 @@ type StopOptions struct {
 func Stop(t testing.TestingT, containers []string, options *StopOptions) string {
 	out, err := StopE(t, containers, options)
 	require.NoError(t, err)
+
 	return out
 }
 
@@ -30,23 +32,19 @@ func Stop(t testing.TestingT, containers []string, options *StopOptions) string 
 func StopE(t testing.TestingT, containers []string, options *StopOptions) (string, error) {
 	options.Logger.Logf(t, "Running 'docker stop' on containers '%s'", containers)
 
-	args, err := formatDockerStopArgs(containers, options)
-	if err != nil {
-		return "", err
-	}
+	args := formatDockerStopArgs(containers, options)
 
-	cmd := shell.Command{
+	cmd := &shell.Command{
 		Command: "docker",
 		Args:    args,
 		Logger:  options.Logger,
 	}
 
-	return shell.RunCommandAndGetOutputE(t, cmd)
-
+	return shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
 }
 
 // formatDockerStopArgs formats the arguments for the 'docker stop' command
-func formatDockerStopArgs(containers []string, options *StopOptions) ([]string, error) {
+func formatDockerStopArgs(containers []string, options *StopOptions) []string {
 	args := []string{"stop"}
 
 	if options.Time != 0 {
@@ -55,5 +53,5 @@ func formatDockerStopArgs(containers []string, options *StopOptions) ([]string, 
 
 	args = append(args, containers...)
 
-	return args, nil
+	return args
 }

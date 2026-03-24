@@ -1,7 +1,9 @@
 package docker
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -12,6 +14,9 @@ import (
 	"github.com/gruntwork-io/terratest/modules/shell"
 	"github.com/stretchr/testify/require"
 )
+
+// ErrNoContainerFound is returned when no container is found with the given ID.
+var ErrNoContainerFound = errors.New("no container found")
 
 // ContainerInspect defines the output of the Inspect method, with the options returned by 'docker inspect'
 // converted into a more friendly and testable interface
@@ -28,12 +33,6 @@ type ContainerInspect struct {
 	// String representing the container's status
 	Status string
 
-	// Whether the container is currently running or not
-	Running bool
-
-	// Container's exit code
-	ExitCode uint8
-
 	// String with the container's error message, if there is any
 	Error string
 
@@ -45,13 +44,19 @@ type ContainerInspect struct {
 
 	// Health check
 	Health HealthCheck
+
+	// Container's exit code
+	ExitCode uint8
+
+	// Whether the container is currently running or not
+	Running bool
 }
 
 // Port represents a single port mapping exported by the container
 type Port struct {
+	Protocol      string
 	HostPort      uint16
 	ContainerPort uint16
-	Protocol      string
 }
 
 // VolumeBind represents a single volume binding made to the container
@@ -63,57 +68,63 @@ type VolumeBind struct {
 // HealthCheck represents the current health history of the container
 type HealthCheck struct {
 	// Health check status
-	Status string
-
-	// Current count of failing health checks
-	FailingStreak uint8
+	Status string `json:"Status"`
 
 	// Log of failures
-	Log []HealthLog
+	Log []HealthLog `json:"Log"`
+
+	// Current count of failing health checks
+	FailingStreak uint8 `json:"FailingStreak"`
 }
 
 // HealthLog represents the output of a single Health check of the container
 type HealthLog struct {
 	// Start time of health check
-	Start string
+	Start string `json:"Start"`
 
 	// End time of health check
-	End string
-
-	// Exit code of health check
-	ExitCode uint8
+	End string `json:"End"`
 
 	// Output of health check
-	Output string
+	Output string `json:"Output"`
+
+	// Exit code of health check
+	ExitCode uint8 `json:"ExitCode"`
 }
+
+// volumeBindParts is the expected number of colon-separated parts in a host
+// volume bind string (source:destination).
+const volumeBindParts = 2
 
 // inspectOutput defines options that will be returned by 'docker inspect', in JSON format.
 // Not all options are included here, only the ones that we might need
 type inspectOutput struct {
-	Id      string
-	Created string
-	Name    string
-	State   struct {
-		Health   HealthCheck
-		Status   string
-		Running  bool
-		ExitCode uint8
-		Error    string
-	}
 	NetworkSettings struct {
 		Ports map[string][]struct {
-			HostIp   string
-			HostPort string
-		}
-	}
+			HostIP   string `json:"HostIp"`
+			HostPort string `json:"HostPort"`
+		} `json:"Ports"`
+	} `json:"NetworkSettings"`
 	HostConfig struct {
-		Binds []string
-	}
+		Binds []string `json:"Binds"`
+	} `json:"HostConfig"`
+	ID      string `json:"Id"`
+	Created string `json:"Created"`
+	Name    string `json:"Name"`
+	State   struct {
+		Status   string      `json:"Status"`
+		Error    string      `json:"Error"`
+		Health   HealthCheck `json:"Health"`
+		ExitCode uint8       `json:"ExitCode"`
+		Running  bool        `json:"Running"`
+	} `json:"State"`
 }
 
 // Inspect runs the 'docker inspect {container id}' command and returns a ContainerInspect
 // struct, converted from the output JSON, along with any errors
 func Inspect(t *testing.T, id string) *ContainerInspect {
+	t.Helper()
+
 	out, err := InspectE(t, id)
 	require.NoError(t, err)
 
@@ -123,35 +134,40 @@ func Inspect(t *testing.T, id string) *ContainerInspect {
 // InspectE runs the 'docker inspect {container id}' command and returns a ContainerInspect
 // struct, converted from the output JSON, along with any errors
 func InspectE(t *testing.T, id string) (*ContainerInspect, error) {
-	cmd := shell.Command{
+	t.Helper()
+
+	cmd := &shell.Command{
 		Command: "docker",
 		Args:    []string{"container", "inspect", id},
 		// inspect is a short-running command, don't print the output.
 		Logger: logger.Discard,
 	}
 
-	out, err := shell.RunCommandAndGetStdOutE(t, cmd)
+	out, err := shell.RunCommandContextAndGetStdOutE(t, context.Background(), cmd)
 	if err != nil {
 		return nil, err
 	}
 
 	var containers []inspectOutput
+
 	err = json.Unmarshal([]byte(out), &containers)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(containers) == 0 {
-		return nil, fmt.Errorf("no container found with ID %s", id)
+		return nil, fmt.Errorf("%w: %s", ErrNoContainerFound, id)
 	}
 
-	container := containers[0]
+	container := &containers[0]
 
 	return transformContainer(t, container)
 }
 
-// transformContainerPorts converts 'docker inspect' output JSON into a more friendly and testable format
-func transformContainer(t *testing.T, container inspectOutput) (*ContainerInspect, error) {
+// transformContainer converts 'docker inspect' output JSON into a more friendly and testable format
+func transformContainer(t *testing.T, container *inspectOutput) (*ContainerInspect, error) {
+	t.Helper()
+
 	name := strings.TrimLeft(container.Name, "/")
 
 	ports, err := transformContainerPorts(container)
@@ -167,7 +183,7 @@ func transformContainer(t *testing.T, container inspectOutput) (*ContainerInspec
 	}
 
 	inspect := ContainerInspect{
-		ID:       container.Id,
+		ID:       container.ID,
 		Name:     name,
 		Created:  created,
 		Status:   container.State.Status,
@@ -196,7 +212,7 @@ func transformContainer(t *testing.T, container inspectOutput) (*ContainerInspec
 //	    }
 //	  ]
 //	}
-func transformContainerPorts(container inspectOutput) ([]Port, error) {
+func transformContainerPorts(container *inspectOutput) ([]Port, error) {
 	var ports []Port
 
 	cPorts := container.NetworkSettings.Ports
@@ -232,18 +248,19 @@ func transformContainerPorts(container inspectOutput) ([]Port, error) {
 }
 
 // GetExposedHostPort returns an exposed host port according to requested container port. Returns 0 if the requested port is not exposed.
-func (inspectOutput ContainerInspect) GetExposedHostPort(containerPort uint16) uint16 {
-	for _, port := range inspectOutput.Ports {
+func (c *ContainerInspect) GetExposedHostPort(containerPort uint16) uint16 {
+	for _, port := range c.Ports {
 		if port.ContainerPort == containerPort {
 			return port.HostPort
 		}
 	}
+
 	return uint16(0)
 }
 
 // transformContainerVolumes converts Docker's volume bindings from the
 // format "/foo/bar:/foo/baz" into a more testable one
-func transformContainerVolumes(container inspectOutput) []VolumeBind {
+func transformContainerVolumes(container *inspectOutput) []VolumeBind {
 	binds := container.HostConfig.Binds
 	volumes := make([]VolumeBind, 0, len(binds))
 
@@ -255,7 +272,7 @@ func transformContainerVolumes(container inspectOutput) []VolumeBind {
 		// Considering it as an unbound volume
 		dest = split[0]
 
-		if len(split) == 2 {
+		if len(split) == volumeBindParts {
 			source = split[0]
 			dest = split[1]
 		}

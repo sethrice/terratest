@@ -1,10 +1,11 @@
-package docker
+package docker_test
 
 import (
 	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/docker"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,17 +13,17 @@ import (
 func TestListImagesAndDeleteImage(t *testing.T) {
 	t.Parallel()
 
-	uniqueID := strings.ToLower(random.UniqueId())
+	uniqueID := strings.ToLower(random.UniqueID())
 	repo := "gruntwork-io/test-image"
-	tag := fmt.Sprintf("v1-%s", uniqueID)
+	tag := "v1-" + uniqueID
 	img := fmt.Sprintf("%s:%s", repo, tag)
 
-	options := &BuildOptions{
+	options := &docker.BuildOptions{
 		Tags: []string{img},
 	}
-	Build(t, "../../test/fixtures/docker", options)
+	docker.Build(t, "../../test/fixtures/docker", options)
 
-	assert.True(t, DoesImageExist(t, img, nil))
-	DeleteImage(t, img, nil)
-	assert.False(t, DoesImageExist(t, img, nil))
+	assert.True(t, docker.DoesImageExist(t, img, nil))
+	docker.DeleteImage(t, img, nil)
+	assert.False(t, docker.DoesImageExist(t, img, nil))
 }
