@@ -69,7 +69,7 @@ func GetRandomRegionContextE(t testing.TestingT, ctx context.Context, projectID 
 	regionsToPickFrom := approvedRegions
 
 	if len(regionsToPickFrom) == 0 {
-		allRegions, err := GetAllGcpRegionsContextE(t, ctx, projectID)
+		allRegions, err := GetAllGCPRegionsContextE(t, ctx, projectID)
 		if err != nil {
 			return "", err
 		}
@@ -133,7 +133,7 @@ func GetRandomZoneContextE(t testing.TestingT, ctx context.Context, projectID st
 	zonesToPickFrom := approvedZones
 
 	if len(zonesToPickFrom) == 0 {
-		allZones, err := GetAllGcpZonesContextE(t, ctx, projectID)
+		allZones, err := GetAllGCPZonesContextE(t, ctx, projectID)
 		if err != nil {
 			return "", err
 		}
@@ -193,7 +193,7 @@ func GetRandomZoneForRegionContextE(t testing.TestingT, ctx context.Context, pro
 		return zoneFromEnvVar, nil
 	}
 
-	allZones, err := GetAllGcpZonesContextE(t, ctx, projectID)
+	allZones, err := GetAllGCPZonesContextE(t, ctx, projectID)
 	if err != nil {
 		return "", err
 	}
@@ -213,19 +213,27 @@ func GetRandomZoneForRegionContextE(t testing.TestingT, ctx context.Context, pro
 	return zone, nil
 }
 
+// GetAllGCPRegions gets the list of GCP regions available in this account.
+// This will fail the test if there is an error.
+//
+// Deprecated: Use [GetAllGCPRegionsContext] instead.
+func GetAllGCPRegions(t testing.TestingT, projectID string) []string {
+	return GetAllGCPRegionsContext(t, context.Background(), projectID)
+}
+
 // GetAllGcpRegions gets the list of GCP regions available in this account.
 // This will fail the test if there is an error.
 //
-// Deprecated: Use [GetAllGcpRegionsContext] instead.
-func GetAllGcpRegions(t testing.TestingT, projectID string) []string {
-	return GetAllGcpRegionsContext(t, context.Background(), projectID)
+// Deprecated: Use [GetAllGCPRegionsContext] instead.
+func GetAllGcpRegions(t testing.TestingT, projectID string) []string { //nolint:staticcheck,revive // preserving deprecated function name
+	return GetAllGCPRegionsContext(t, context.Background(), projectID)
 }
 
-// GetAllGcpRegionsContext gets the list of GCP regions available in this account.
+// GetAllGCPRegionsContext gets the list of GCP regions available in this account.
 // This will fail the test if there is an error.
 // The ctx parameter supports cancellation and timeouts.
-func GetAllGcpRegionsContext(t testing.TestingT, ctx context.Context, projectID string) []string {
-	out, err := GetAllGcpRegionsContextE(t, ctx, projectID)
+func GetAllGCPRegionsContext(t testing.TestingT, ctx context.Context, projectID string) []string {
+	out, err := GetAllGCPRegionsContextE(t, ctx, projectID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,16 +241,40 @@ func GetAllGcpRegionsContext(t testing.TestingT, ctx context.Context, projectID 
 	return out
 }
 
+// GetAllGcpRegionsContext gets the list of GCP regions available in this account.
+// This will fail the test if there is an error.
+// The ctx parameter supports cancellation and timeouts.
+//
+// Deprecated: Use [GetAllGCPRegionsContext] instead.
+func GetAllGcpRegionsContext(t testing.TestingT, ctx context.Context, projectID string) []string { //nolint:staticcheck,revive // preserving deprecated function name
+	return GetAllGCPRegionsContext(t, ctx, projectID)
+}
+
+// GetAllGCPRegionsE gets the list of GCP regions available in this account.
+//
+// Deprecated: Use [GetAllGCPRegionsContextE] instead.
+func GetAllGCPRegionsE(t testing.TestingT, projectID string) ([]string, error) {
+	return GetAllGCPRegionsContextE(t, context.Background(), projectID)
+}
+
 // GetAllGcpRegionsE gets the list of GCP regions available in this account.
 //
-// Deprecated: Use [GetAllGcpRegionsContextE] instead.
-func GetAllGcpRegionsE(t testing.TestingT, projectID string) ([]string, error) {
-	return GetAllGcpRegionsContextE(t, context.Background(), projectID)
+// Deprecated: Use [GetAllGCPRegionsContextE] instead.
+func GetAllGcpRegionsE(t testing.TestingT, projectID string) ([]string, error) { //nolint:staticcheck,revive // preserving deprecated function name
+	return GetAllGCPRegionsContextE(t, context.Background(), projectID)
 }
 
 // GetAllGcpRegionsContextE gets the list of GCP regions available in this account.
 // The ctx parameter supports cancellation and timeouts.
-func GetAllGcpRegionsContextE(t testing.TestingT, ctx context.Context, projectID string) ([]string, error) {
+//
+// Deprecated: Use [GetAllGCPRegionsContextE] instead.
+func GetAllGcpRegionsContextE(t testing.TestingT, ctx context.Context, projectID string) ([]string, error) { //nolint:staticcheck,revive // preserving deprecated function name
+	return GetAllGCPRegionsContextE(t, ctx, projectID)
+}
+
+// GetAllGCPRegionsContextE gets the list of GCP regions available in this account.
+// The ctx parameter supports cancellation and timeouts.
+func GetAllGCPRegionsContextE(t testing.TestingT, ctx context.Context, projectID string) ([]string, error) {
 	logger.Default.Logf(t, "Looking up all GCP regions available in this account")
 
 	service, err := NewComputeServiceContextE(t, ctx)
@@ -267,19 +299,27 @@ func GetAllGcpRegionsContextE(t testing.TestingT, ctx context.Context, projectID
 	return regions, nil
 }
 
+// GetAllGCPZones gets the list of GCP Zones available in this account.
+// This will fail the test if there is an error.
+//
+// Deprecated: Use [GetAllGCPZonesContext] instead.
+func GetAllGCPZones(t testing.TestingT, projectID string) []string {
+	return GetAllGCPZonesContext(t, context.Background(), projectID)
+}
+
 // GetAllGcpZones gets the list of GCP Zones available in this account.
 // This will fail the test if there is an error.
 //
-// Deprecated: Use [GetAllGcpZonesContext] instead.
-func GetAllGcpZones(t testing.TestingT, projectID string) []string {
-	return GetAllGcpZonesContext(t, context.Background(), projectID)
+// Deprecated: Use [GetAllGCPZonesContext] instead.
+func GetAllGcpZones(t testing.TestingT, projectID string) []string { //nolint:staticcheck,revive // preserving deprecated function name
+	return GetAllGCPZonesContext(t, context.Background(), projectID)
 }
 
-// GetAllGcpZonesContext gets the list of GCP Zones available in this account.
+// GetAllGCPZonesContext gets the list of GCP Zones available in this account.
 // This will fail the test if there is an error.
 // The ctx parameter supports cancellation and timeouts.
-func GetAllGcpZonesContext(t testing.TestingT, ctx context.Context, projectID string) []string {
-	out, err := GetAllGcpZonesContextE(t, ctx, projectID)
+func GetAllGCPZonesContext(t testing.TestingT, ctx context.Context, projectID string) []string {
+	out, err := GetAllGCPZonesContextE(t, ctx, projectID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,16 +327,40 @@ func GetAllGcpZonesContext(t testing.TestingT, ctx context.Context, projectID st
 	return out
 }
 
+// GetAllGcpZonesContext gets the list of GCP Zones available in this account.
+// This will fail the test if there is an error.
+// The ctx parameter supports cancellation and timeouts.
+//
+// Deprecated: Use [GetAllGCPZonesContext] instead.
+func GetAllGcpZonesContext(t testing.TestingT, ctx context.Context, projectID string) []string { //nolint:staticcheck,revive // preserving deprecated function name
+	return GetAllGCPZonesContext(t, ctx, projectID)
+}
+
+// GetAllGCPZonesE gets the list of GCP Zones available in this account.
+//
+// Deprecated: Use [GetAllGCPZonesContextE] instead.
+func GetAllGCPZonesE(t testing.TestingT, projectID string) ([]string, error) {
+	return GetAllGCPZonesContextE(t, context.Background(), projectID)
+}
+
 // GetAllGcpZonesE gets the list of GCP Zones available in this account.
 //
-// Deprecated: Use [GetAllGcpZonesContextE] instead.
-func GetAllGcpZonesE(t testing.TestingT, projectID string) ([]string, error) {
-	return GetAllGcpZonesContextE(t, context.Background(), projectID)
+// Deprecated: Use [GetAllGCPZonesContextE] instead.
+func GetAllGcpZonesE(t testing.TestingT, projectID string) ([]string, error) { //nolint:staticcheck,revive // preserving deprecated function name
+	return GetAllGCPZonesContextE(t, context.Background(), projectID)
 }
 
 // GetAllGcpZonesContextE gets the list of GCP Zones available in this account.
 // The ctx parameter supports cancellation and timeouts.
-func GetAllGcpZonesContextE(t testing.TestingT, ctx context.Context, projectID string) ([]string, error) {
+//
+// Deprecated: Use [GetAllGCPZonesContextE] instead.
+func GetAllGcpZonesContextE(t testing.TestingT, ctx context.Context, projectID string) ([]string, error) { //nolint:staticcheck,revive // preserving deprecated function name
+	return GetAllGCPZonesContextE(t, ctx, projectID)
+}
+
+// GetAllGCPZonesContextE gets the list of GCP Zones available in this account.
+// The ctx parameter supports cancellation and timeouts.
+func GetAllGCPZonesContextE(t testing.TestingT, ctx context.Context, projectID string) ([]string, error) {
 	service, err := NewComputeServiceContextE(t, ctx)
 	if err != nil {
 		return nil, err

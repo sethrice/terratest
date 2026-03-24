@@ -974,9 +974,16 @@ func NewInstancesServiceContextE(t testing.TestingT, ctx context.Context) (*comp
 	return service.Instances, nil
 }
 
-// RandomValidGcpName returns a random, valid name for GCP resources. Many resources in GCP require lowercase letters only.
-func RandomValidGcpName() string {
+// RandomValidGCPName returns a random, valid name for GCP resources. Many resources in GCP require lowercase letters only.
+func RandomValidGCPName() string {
 	id := strings.ToLower(random.UniqueID())
 
 	return "terratest-" + id
+}
+
+// RandomValidGcpName returns a random, valid name for GCP resources. Many resources in GCP require lowercase letters only.
+//
+// Deprecated: Use [RandomValidGCPName] instead.
+func RandomValidGcpName() string { //nolint:staticcheck,revive // preserving deprecated function name
+	return RandomValidGCPName()
 }
