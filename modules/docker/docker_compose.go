@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"context"
 	"regexp"
 	"strings"
 
@@ -13,43 +14,69 @@ import (
 
 // Options are Docker options.
 type Options struct {
-	WorkingDir string
 	EnvVars    map[string]string
+	Logger     *logger.Logger
+	WorkingDir string
+
+	ProjectName string
 
 	// Whether ot not to enable buildkit. You can find more information about buildkit here https://docs.docker.com/build/buildkit/#getting-started.
 	EnableBuildKit bool
-
-	// Set a logger that should be used. See the logger package for more info.
-	Logger      *logger.Logger
-	ProjectName string
 }
 
 // RunDockerCompose runs docker compose with the given arguments and options and return stdout/stderr.
+//
+// Deprecated: Use [RunDockerComposeContext] instead.
 func RunDockerCompose(t testing.TestingT, options *Options, args ...string) string {
-	out, err := runDockerComposeE(t, false, options, args...)
+	return RunDockerComposeContext(t, context.Background(), options, args...)
+}
+
+// RunDockerComposeContext runs docker compose with the given arguments and options and returns stdout/stderr.
+// This method fails the test if there are any errors. The ctx parameter supports cancellation and timeouts.
+func RunDockerComposeContext(t testing.TestingT, ctx context.Context, options *Options, args ...string) string {
+	out, err := runDockerComposeE(t, ctx, false, options, args...)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return out
 }
 
-// RunDockerComposeAndGetStdout runs docker compose with the given arguments and options and returns only stdout.
+// RunDockerComposeAndGetStdOut runs docker compose with the given arguments and options and returns only stdout.
+//
+// Deprecated: Use [RunDockerComposeAndGetStdOutContext] instead.
 func RunDockerComposeAndGetStdOut(t testing.TestingT, options *Options, args ...string) string {
-	out, err := runDockerComposeE(t, true, options, args...)
+	return RunDockerComposeAndGetStdOutContext(t, context.Background(), options, args...)
+}
+
+// RunDockerComposeAndGetStdOutContext runs docker compose with the given arguments and options and returns only
+// stdout. This method fails the test if there are any errors. The ctx parameter supports cancellation and
+// timeouts.
+func RunDockerComposeAndGetStdOutContext(t testing.TestingT, ctx context.Context, options *Options, args ...string) string {
+	out, err := runDockerComposeE(t, ctx, true, options, args...)
 	require.NoError(t, err)
+
 	return out
 }
 
 // RunDockerComposeE runs docker compose with the given arguments and options and return stdout/stderr.
+//
+// Deprecated: Use [RunDockerComposeContextE] instead.
 func RunDockerComposeE(t testing.TestingT, options *Options, args ...string) (string, error) {
-	return runDockerComposeE(t, false, options, args...)
+	return RunDockerComposeContextE(t, context.Background(), options, args...)
 }
 
-func runDockerComposeE(t testing.TestingT, stdout bool, options *Options, args ...string) (string, error) {
-	var cmd shell.Command
+// RunDockerComposeContextE runs docker compose with the given arguments and options and returns stdout/stderr,
+// or any error. The ctx parameter supports cancellation and timeouts.
+func RunDockerComposeContextE(t testing.TestingT, ctx context.Context, options *Options, args ...string) (string, error) {
+	return runDockerComposeE(t, ctx, false, options, args...)
+}
+
+func runDockerComposeE(t testing.TestingT, ctx context.Context, stdout bool, options *Options, args ...string) (string, error) {
+	var cmd *shell.Command
 
 	projectName := options.ProjectName
-	if len(projectName) <= 0 {
+	if len(projectName) == 0 {
 		projectName = strings.ToLower(t.Name())
 	}
 
@@ -66,7 +93,7 @@ func runDockerComposeE(t testing.TestingT, stdout bool, options *Options, args .
 	}
 
 	if result.ExitCode == 0 {
-		cmd = shell.Command{
+		cmd = &shell.Command{
 			Command:    "docker",
 			Args:       append([]string{"compose", "--project-name", generateValidDockerComposeProjectName(projectName)}, args...),
 			WorkingDir: options.WorkingDir,
@@ -74,7 +101,7 @@ func runDockerComposeE(t testing.TestingT, stdout bool, options *Options, args .
 			Logger:     options.Logger,
 		}
 	} else {
-		cmd = shell.Command{
+		cmd = &shell.Command{
 			Command: "docker-compose",
 			// We append --project-name to ensure containers from multiple different tests using Docker Compose don't end
 			// up in the same project and end up conflicting with each other.
@@ -86,14 +113,16 @@ func runDockerComposeE(t testing.TestingT, stdout bool, options *Options, args .
 	}
 
 	if stdout {
-		return shell.RunCommandAndGetStdOut(t, cmd), nil
+		return shell.RunCommandContextAndGetStdOut(t, ctx, cmd), nil
 	}
 
-	return shell.RunCommandAndGetOutputE(t, cmd)
+	return shell.RunCommandContextAndGetOutputE(t, ctx, cmd)
 }
 
+// generateValidDockerComposeProjectName generates a valid project name for docker-compose.
 // Note: docker-compose command doesn't like lower case or special characters, other than -.
 func generateValidDockerComposeProjectName(str string) string {
-	lower_str := strings.ToLower(str)
-	return regexp.MustCompile(`[^a-zA-Z0-9 ]+`).ReplaceAllString(lower_str, "-")
+	lowerStr := strings.ToLower(str)
+
+	return regexp.MustCompile(`[^a-zA-Z0-9 ]+`).ReplaceAllString(lowerStr, "-")
 }

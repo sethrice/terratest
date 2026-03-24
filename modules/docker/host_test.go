@@ -1,14 +1,13 @@
-package docker
+package docker_test
 
 import (
-	"fmt"
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/docker"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetDockerHostFromEnv(t *testing.T) {
-
 	t.Parallel()
 
 	tests := []struct {
@@ -16,53 +15,53 @@ func TestGetDockerHostFromEnv(t *testing.T) {
 		Expected string
 	}{
 		{
-			"unix:///var/run/docker.sock",
-			"localhost",
+			Input:    "unix:///var/run/docker.sock",
+			Expected: "localhost",
 		},
 		{
-			"npipe:////./pipe/docker_engine",
-			"localhost",
+			Input:    "npipe:////./pipe/docker_engine",
+			Expected: "localhost",
 		},
 		{
-			"tcp://1.2.3.4:1234",
-			"1.2.3.4",
+			Input:    "tcp://1.2.3.4:1234",
+			Expected: "1.2.3.4",
 		},
 		{
-			"tcp://1.2.3.4",
-			"1.2.3.4",
+			Input:    "tcp://1.2.3.4",
+			Expected: "1.2.3.4",
 		},
 		{
-			"ssh://1.2.3.4:22",
-			"1.2.3.4",
+			Input:    "ssh://1.2.3.4:22",
+			Expected: "1.2.3.4",
 		},
 		{
-			"fd://1.2.3.4:1234",
-			"1.2.3.4",
+			Input:    "fd://1.2.3.4:1234",
+			Expected: "1.2.3.4",
 		},
 		{
-			"",
-			"localhost",
+			Input:    "",
+			Expected: "localhost",
 		},
 		{
-			"invalidValue",
-			"localhost",
+			Input:    "invalidValue",
+			Expected: "localhost",
 		},
 		{
-			"invalid::value::with::semicolons",
-			"localhost",
+			Input:    "invalid::value::with::semicolons",
+			Expected: "localhost",
 		},
 	}
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("GetDockerHostFromEnv: %s", test.Input), func(t *testing.T) {
+		t.Run("GetDockerHostFromEnv: "+test.Input, func(t *testing.T) {
 			t.Parallel()
 
 			testEnv := []string{
 				"FOO=bar",
-				fmt.Sprintf("DOCKER_HOST=%s", test.Input),
+				"DOCKER_HOST=" + test.Input,
 				"BAR=baz",
 			}
 
-			host := getDockerHostFromEnv(testEnv)
+			host := docker.GetDockerHostFromEnv(testEnv)
 			assert.Equal(t, test.Expected, host)
 		})
 	}
@@ -75,7 +74,7 @@ func TestGetDockerHostFromEnv(t *testing.T) {
 			"BAR=baz",
 		}
 
-		host := getDockerHostFromEnv(testEnv)
+		host := docker.GetDockerHostFromEnv(testEnv)
 		assert.Equal(t, "localhost", host)
 	})
 }
