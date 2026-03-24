@@ -16,7 +16,8 @@ func Push(t testing.TestingT, logger *logger.Logger, tag string) {
 	PushContext(t, context.Background(), logger, tag)
 }
 
-// PushContext is like [Push] but includes a context.
+// PushContext runs the 'docker push' command to push the given tag. This will fail the test if there are any
+// errors. The ctx parameter supports cancellation and timeouts.
 func PushContext(t testing.TestingT, ctx context.Context, logger *logger.Logger, tag string) {
 	require.NoError(t, PushContextE(t, ctx, logger, tag))
 }
@@ -28,7 +29,8 @@ func PushE(t testing.TestingT, logger *logger.Logger, tag string) error {
 	return PushContextE(t, context.Background(), logger, tag)
 }
 
-// PushContextE is like [PushE] but includes a context.
+// PushContextE runs the 'docker push' command to push the given tag. The ctx parameter supports cancellation
+// and timeouts.
 func PushContextE(t testing.TestingT, ctx context.Context, logger *logger.Logger, tag string) error {
 	logger.Logf(t, "Running 'docker push' for tag %s", tag)
 

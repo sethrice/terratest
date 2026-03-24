@@ -27,7 +27,8 @@ func Stop(t testing.TestingT, containers []string, options *StopOptions) string 
 	return StopContext(t, context.Background(), containers, options)
 }
 
-// StopContext is like [Stop] but includes a context.
+// StopContext runs the 'docker stop' command for the given containers and returns stdout/stderr. This method
+// fails the test if there are any errors. The ctx parameter supports cancellation and timeouts.
 func StopContext(t testing.TestingT, ctx context.Context, containers []string, options *StopOptions) string {
 	out, err := StopContextE(t, ctx, containers, options)
 	require.NoError(t, err)
@@ -42,7 +43,8 @@ func StopE(t testing.TestingT, containers []string, options *StopOptions) (strin
 	return StopContextE(t, context.Background(), containers, options)
 }
 
-// StopContextE is like [StopE] but includes a context.
+// StopContextE runs the 'docker stop' command for the given containers and returns stdout/stderr, or any
+// error. The ctx parameter supports cancellation and timeouts.
 func StopContextE(t testing.TestingT, ctx context.Context, containers []string, options *StopOptions) (string, error) {
 	options.Logger.Logf(t, "Running 'docker stop' on containers '%s'", containers)
 

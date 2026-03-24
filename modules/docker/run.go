@@ -65,7 +65,8 @@ func Run(t testing.TestingT, image string, options *RunOptions) string {
 	return RunContext(t, context.Background(), image, options)
 }
 
-// RunContext is like [Run] but includes a context.
+// RunContext runs the 'docker run' command on the given image with the given options and returns stdout/stderr.
+// This method fails the test if there are any errors. The ctx parameter supports cancellation and timeouts.
 func RunContext(t testing.TestingT, ctx context.Context, image string, options *RunOptions) string {
 	out, err := RunContextE(t, ctx, image, options)
 	require.NoError(t, err)
@@ -80,7 +81,8 @@ func RunE(t testing.TestingT, image string, options *RunOptions) (string, error)
 	return RunContextE(t, context.Background(), image, options)
 }
 
-// RunContextE is like [RunE] but includes a context.
+// RunContextE runs the 'docker run' command on the given image with the given options and returns
+// stdout/stderr, or any error. The ctx parameter supports cancellation and timeouts.
 func RunContextE(t testing.TestingT, ctx context.Context, image string, options *RunOptions) (string, error) {
 	options.Logger.Logf(t, "Running 'docker run' on image '%s'", image)
 
@@ -103,7 +105,9 @@ func RunAndGetID(t testing.TestingT, image string, options *RunOptions) string {
 	return RunAndGetIDContext(t, context.Background(), image, options)
 }
 
-// RunAndGetIDContext is like [RunAndGetID] but includes a context.
+// RunAndGetIDContext runs the 'docker run' command on the given image with the given options and returns the
+// container ID that is returned in stdout. This method fails the test if there are any errors. The ctx
+// parameter supports cancellation and timeouts.
 func RunAndGetIDContext(t testing.TestingT, ctx context.Context, image string, options *RunOptions) string {
 	out, err := RunAndGetIDContextE(t, ctx, image, options)
 	require.NoError(t, err)
@@ -119,7 +123,8 @@ func RunAndGetIDE(t testing.TestingT, image string, options *RunOptions) (string
 	return RunAndGetIDContextE(t, context.Background(), image, options)
 }
 
-// RunAndGetIDContextE is like [RunAndGetIDE] but includes a context.
+// RunAndGetIDContextE runs the 'docker run' command on the given image with the given options and returns the
+// container ID that is returned in stdout, or any error. The ctx parameter supports cancellation and timeouts.
 func RunAndGetIDContextE(t testing.TestingT, ctx context.Context, image string, options *RunOptions) (string, error) {
 	options.Logger.Logf(t, "Running 'docker run' on image '%s', returning stdout", image)
 

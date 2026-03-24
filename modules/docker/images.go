@@ -60,7 +60,8 @@ func DeleteImage(t testing.TestingT, img string, logger *logger.Logger) {
 	DeleteImageContext(t, context.Background(), img, logger)
 }
 
-// DeleteImageContext is like [DeleteImage] but includes a context.
+// DeleteImageContext removes a docker image using the Docker CLI. This will fail the test if there is an error.
+// The ctx parameter supports cancellation and timeouts.
 func DeleteImageContext(t testing.TestingT, ctx context.Context, img string, logger *logger.Logger) {
 	require.NoError(t, DeleteImageContextE(t, ctx, img, logger))
 }
@@ -72,7 +73,8 @@ func DeleteImageE(t testing.TestingT, img string, logger *logger.Logger) error {
 	return DeleteImageContextE(t, context.Background(), img, logger)
 }
 
-// DeleteImageContextE is like [DeleteImageE] but includes a context.
+// DeleteImageContextE removes a docker image using the Docker CLI. The ctx parameter supports cancellation and
+// timeouts.
 func DeleteImageContextE(t testing.TestingT, ctx context.Context, img string, logger *logger.Logger) error {
 	cmd := &shell.Command{
 		Command: "docker",
@@ -90,7 +92,8 @@ func ListImages(t testing.TestingT, logger *logger.Logger) []Image {
 	return ListImagesContext(t, context.Background(), logger)
 }
 
-// ListImagesContext is like [ListImages] but includes a context.
+// ListImagesContext calls docker images using the Docker CLI to list the available images on the local docker
+// daemon. This will fail the test if there is an error. The ctx parameter supports cancellation and timeouts.
 func ListImagesContext(t testing.TestingT, ctx context.Context, logger *logger.Logger) []Image {
 	out, err := ListImagesContextE(t, ctx, logger)
 	require.NoError(t, err)
@@ -105,7 +108,8 @@ func ListImagesE(t testing.TestingT, logger *logger.Logger) ([]Image, error) {
 	return ListImagesContextE(t, context.Background(), logger)
 }
 
-// ListImagesContextE is like [ListImagesE] but includes a context.
+// ListImagesContextE calls docker images using the Docker CLI to list the available images on the local docker
+// daemon. The ctx parameter supports cancellation and timeouts.
 func ListImagesContextE(t testing.TestingT, ctx context.Context, logger *logger.Logger) ([]Image, error) {
 	cmd := &shell.Command{
 		Command: "docker",
@@ -146,7 +150,9 @@ func DoesImageExist(t testing.TestingT, imgLabel string, logger *logger.Logger) 
 	return DoesImageExistContext(t, context.Background(), imgLabel, logger)
 }
 
-// DoesImageExistContext is like [DoesImageExist] but includes a context.
+// DoesImageExistContext lists the images in the docker daemon and returns true if the given image label
+// (repo:tag) exists. This will fail the test if there is an error. The ctx parameter supports cancellation and
+// timeouts.
 func DoesImageExistContext(t testing.TestingT, ctx context.Context, imgLabel string, logger *logger.Logger) bool {
 	images := ListImagesContext(t, ctx, logger)
 

@@ -68,7 +68,8 @@ func Build(t testing.TestingT, path string, options *BuildOptions) {
 	BuildContext(t, context.Background(), path, options)
 }
 
-// BuildContext is like [Build] but includes a context.
+// BuildContext runs the 'docker build' command at the given path with the given options and fails the test if
+// there are any errors. The ctx parameter supports cancellation and timeouts.
 func BuildContext(t testing.TestingT, ctx context.Context, path string, options *BuildOptions) {
 	require.NoError(t, BuildContextE(t, ctx, path, options))
 }
@@ -80,7 +81,8 @@ func BuildE(t testing.TestingT, path string, options *BuildOptions) error {
 	return BuildContextE(t, context.Background(), path, options)
 }
 
-// BuildContextE is like [BuildE] but includes a context.
+// BuildContextE runs the 'docker build' command at the given path with the given options and returns any errors.
+// The ctx parameter supports cancellation and timeouts.
 func BuildContextE(t testing.TestingT, ctx context.Context, path string, options *BuildOptions) error {
 	options.Logger.Logf(t, "Running 'docker build' in %s", path)
 
@@ -149,7 +151,10 @@ func GitCloneAndBuild(
 	GitCloneAndBuildContext(t, context.Background(), repo, ref, path, dockerBuildOpts)
 }
 
-// GitCloneAndBuildContext is like [GitCloneAndBuild] but includes a context.
+// GitCloneAndBuildContext builds a new Docker image from a given Git repo. This function will clone the given
+// repo at the specified ref, and call the docker build command on the cloned repo from the given relative path
+// (relative to repo root). This will fail the test if there are any errors. The ctx parameter supports
+// cancellation and timeouts.
 func GitCloneAndBuildContext(
 	t testing.TestingT,
 	ctx context.Context,
@@ -176,7 +181,9 @@ func GitCloneAndBuildE(
 	return GitCloneAndBuildContextE(t, context.Background(), repo, ref, path, dockerBuildOpts)
 }
 
-// GitCloneAndBuildContextE is like [GitCloneAndBuildE] but includes a context.
+// GitCloneAndBuildContextE builds a new Docker image from a given Git repo. This function will clone the given
+// repo at the specified ref, and call the docker build command on the cloned repo from the given relative path
+// (relative to repo root). The ctx parameter supports cancellation and timeouts.
 func GitCloneAndBuildContextE(
 	t testing.TestingT,
 	ctx context.Context,

@@ -31,7 +31,8 @@ func RunDockerCompose(t testing.TestingT, options *Options, args ...string) stri
 	return RunDockerComposeContext(t, context.Background(), options, args...)
 }
 
-// RunDockerComposeContext is like [RunDockerCompose] but includes a context.
+// RunDockerComposeContext runs docker compose with the given arguments and options and returns stdout/stderr.
+// This method fails the test if there are any errors. The ctx parameter supports cancellation and timeouts.
 func RunDockerComposeContext(t testing.TestingT, ctx context.Context, options *Options, args ...string) string {
 	out, err := runDockerComposeE(t, ctx, false, options, args...)
 	if err != nil {
@@ -48,7 +49,9 @@ func RunDockerComposeAndGetStdOut(t testing.TestingT, options *Options, args ...
 	return RunDockerComposeAndGetStdOutContext(t, context.Background(), options, args...)
 }
 
-// RunDockerComposeAndGetStdOutContext is like [RunDockerComposeAndGetStdOut] but includes a context.
+// RunDockerComposeAndGetStdOutContext runs docker compose with the given arguments and options and returns only
+// stdout. This method fails the test if there are any errors. The ctx parameter supports cancellation and
+// timeouts.
 func RunDockerComposeAndGetStdOutContext(t testing.TestingT, ctx context.Context, options *Options, args ...string) string {
 	out, err := runDockerComposeE(t, ctx, true, options, args...)
 	require.NoError(t, err)
@@ -63,7 +66,8 @@ func RunDockerComposeE(t testing.TestingT, options *Options, args ...string) (st
 	return RunDockerComposeContextE(t, context.Background(), options, args...)
 }
 
-// RunDockerComposeContextE is like [RunDockerComposeE] but includes a context.
+// RunDockerComposeContextE runs docker compose with the given arguments and options and returns stdout/stderr,
+// or any error. The ctx parameter supports cancellation and timeouts.
 func RunDockerComposeContextE(t testing.TestingT, ctx context.Context, options *Options, args ...string) (string, error) {
 	return runDockerComposeE(t, ctx, false, options, args...)
 }

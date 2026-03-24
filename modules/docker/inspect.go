@@ -130,7 +130,9 @@ func Inspect(t *testing.T, id string) *ContainerInspect {
 	return InspectContext(t, context.Background(), id)
 }
 
-// InspectContext is like [Inspect] but includes a context.
+// InspectContext runs the 'docker inspect {container id}' command and returns a [ContainerInspect] struct,
+// converted from the output JSON. This will fail the test if there are any errors. The ctx parameter supports
+// cancellation and timeouts.
 func InspectContext(t *testing.T, ctx context.Context, id string) *ContainerInspect {
 	t.Helper()
 
@@ -150,7 +152,8 @@ func InspectE(t *testing.T, id string) (*ContainerInspect, error) {
 	return InspectContextE(t, context.Background(), id)
 }
 
-// InspectContextE is like [InspectE] but includes a context.
+// InspectContextE runs the 'docker inspect {container id}' command and returns a [ContainerInspect] struct,
+// converted from the output JSON, along with any errors. The ctx parameter supports cancellation and timeouts.
 func InspectContextE(t *testing.T, ctx context.Context, id string) (*ContainerInspect, error) {
 	t.Helper()
 
