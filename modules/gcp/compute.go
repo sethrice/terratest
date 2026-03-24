@@ -726,7 +726,7 @@ func getInstances(t testing.TestingT, ig InstanceGroup, projectID string) []*Ins
 
 // getInstancesE returns a collection of Instance structs from the given Instance Group.
 func getInstancesE(t testing.TestingT, ig InstanceGroup, projectID string) ([]*Instance, error) {
-	instanceIDs, err := ig.GetInstanceIdsE(t)
+	instanceIDs, err := ig.GetInstanceIDsE(t)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Instance Group IDs: %w", err)
 	}

@@ -45,6 +45,8 @@ func CreateBuildContextE(t testing.TestingT, ctx context.Context, projectID stri
 		return nil, err
 	}
 
+	defer func() { _ = service.Close() }()
+
 	req := &cloudbuildpb.CreateBuildRequest{
 		ProjectId: projectID,
 		Build:     build,
@@ -96,6 +98,8 @@ func GetBuildContextE(t testing.TestingT, ctx context.Context, projectID string,
 		return nil, err
 	}
 
+	defer func() { _ = service.Close() }()
+
 	req := &cloudbuildpb.GetBuildRequest{
 		ProjectId: projectID,
 		Id:        buildID,
@@ -141,6 +145,8 @@ func GetBuildsContextE(t testing.TestingT, ctx context.Context, projectID string
 	if err != nil {
 		return nil, err
 	}
+
+	defer func() { _ = service.Close() }()
 
 	req := &cloudbuildpb.ListBuildsRequest{
 		ProjectId: projectID,
