@@ -1,8 +1,9 @@
-package gcp
+package gcp_test
 
 import (
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/gcp"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/compute/v1"
 )
@@ -18,7 +19,7 @@ func TestNewMetadataPreservesExisting(t *testing.T) {
 		Items:       []*compute.MetadataItems{{Key: "existing-key", Value: &existingVal}},
 	}
 
-	result := newMetadata(t, oldMetadata, map[string]string{"new-key": "new-value"})
+	result := gcp.NewMetadata(oldMetadata, map[string]string{"new-key": "new-value"})
 
 	// Convert to map for easier assertion
 	got := make(map[string]string)

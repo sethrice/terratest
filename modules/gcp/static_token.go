@@ -11,5 +11,6 @@ func getStaticTokenSource() (oauth2.TokenSource, bool) {
 	if ok {
 		return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: v}), true
 	}
+
 	return nil, false
 }
