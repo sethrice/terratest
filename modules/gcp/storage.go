@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -11,22 +12,42 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-// CreateStorageBucket creates a Google Cloud bucket with the given BucketAttrs. Note that Google Storage bucket names must be globally unique.
+// CreateStorageBucket creates a Google Cloud bucket with the given BucketAttrs.
+// Note that Google Storage bucket names must be globally unique.
+// This will fail the test if there is an error.
+//
+// Deprecated: Use [CreateStorageBucketContext] instead.
 func CreateStorageBucket(t testing.TestingT, projectID string, name string, attr *storage.BucketAttrs) {
-	err := CreateStorageBucketE(t, projectID, name, attr)
+	CreateStorageBucketContext(t, context.Background(), projectID, name, attr)
+}
+
+// CreateStorageBucketContext creates a Google Cloud bucket with the given BucketAttrs.
+// Note that Google Storage bucket names must be globally unique.
+// This will fail the test if there is an error.
+// The ctx parameter supports cancellation and timeouts.
+func CreateStorageBucketContext(t testing.TestingT, ctx context.Context, projectID string, name string, attr *storage.BucketAttrs) {
+	err := CreateStorageBucketContextE(t, ctx, projectID, name, attr)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-// CreateStorageBucketE creates a Google Cloud bucket with the given BucketAttrs. Note that Google Storage bucket names must be globally unique.
+// CreateStorageBucketE creates a Google Cloud bucket with the given BucketAttrs.
+// Note that Google Storage bucket names must be globally unique.
+//
+// Deprecated: Use [CreateStorageBucketContextE] instead.
 func CreateStorageBucketE(t testing.TestingT, projectID string, name string, attr *storage.BucketAttrs) error {
+	return CreateStorageBucketContextE(t, context.Background(), projectID, name, attr)
+}
+
+// CreateStorageBucketContextE creates a Google Cloud bucket with the given BucketAttrs.
+// Note that Google Storage bucket names must be globally unique.
+// The ctx parameter supports cancellation and timeouts.
+func CreateStorageBucketContextE(t testing.TestingT, ctx context.Context, projectID string, name string, attr *storage.BucketAttrs) error {
 	logger.Default.Logf(t, "Creating bucket %s", name)
 
-	ctx := context.Background()
-
 	// Creates a client.
-	client, err := newStorageClient()
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -39,20 +60,36 @@ func CreateStorageBucketE(t testing.TestingT, projectID string, name string, att
 }
 
 // DeleteStorageBucket destroys the Google Storage bucket.
+// This will fail the test if there is an error.
+//
+// Deprecated: Use [DeleteStorageBucketContext] instead.
 func DeleteStorageBucket(t testing.TestingT, name string) {
-	err := DeleteStorageBucketE(t, name)
+	DeleteStorageBucketContext(t, context.Background(), name)
+}
+
+// DeleteStorageBucketContext destroys the Google Storage bucket.
+// This will fail the test if there is an error.
+// The ctx parameter supports cancellation and timeouts.
+func DeleteStorageBucketContext(t testing.TestingT, ctx context.Context, name string) {
+	err := DeleteStorageBucketContextE(t, ctx, name)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-// DeleteStorageBucketE destroys the Google Cloud Storage bucket in the given region with the given name.
+// DeleteStorageBucketE destroys the Google Cloud Storage bucket with the given name.
+//
+// Deprecated: Use [DeleteStorageBucketContextE] instead.
 func DeleteStorageBucketE(t testing.TestingT, name string) error {
+	return DeleteStorageBucketContextE(t, context.Background(), name)
+}
+
+// DeleteStorageBucketContextE destroys the Google Cloud Storage bucket with the given name.
+// The ctx parameter supports cancellation and timeouts.
+func DeleteStorageBucketContextE(t testing.TestingT, ctx context.Context, name string) error {
 	logger.Default.Logf(t, "Deleting bucket %s", name)
 
-	ctx := context.Background()
-
-	client, err := newStorageClient()
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -61,26 +98,44 @@ func DeleteStorageBucketE(t testing.TestingT, name string) error {
 }
 
 // ReadBucketObject reads an object from the given Storage Bucket and returns its contents.
+// This will fail the test if there is an error.
+//
+// Deprecated: Use [ReadBucketObjectContext] instead.
 func ReadBucketObject(t testing.TestingT, bucketName string, filePath string) io.Reader {
-	out, err := ReadBucketObjectE(t, bucketName, filePath)
+	return ReadBucketObjectContext(t, context.Background(), bucketName, filePath)
+}
+
+// ReadBucketObjectContext reads an object from the given Storage Bucket and returns its contents.
+// This will fail the test if there is an error.
+// The ctx parameter supports cancellation and timeouts.
+func ReadBucketObjectContext(t testing.TestingT, ctx context.Context, bucketName string, filePath string) io.Reader {
+	out, err := ReadBucketObjectContextE(t, ctx, bucketName, filePath)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return out
 }
 
 // ReadBucketObjectE reads an object from the given Storage Bucket and returns its contents.
+//
+// Deprecated: Use [ReadBucketObjectContextE] instead.
 func ReadBucketObjectE(t testing.TestingT, bucketName string, filePath string) (io.Reader, error) {
+	return ReadBucketObjectContextE(t, context.Background(), bucketName, filePath)
+}
+
+// ReadBucketObjectContextE reads an object from the given Storage Bucket and returns its contents.
+// The ctx parameter supports cancellation and timeouts.
+func ReadBucketObjectContextE(t testing.TestingT, ctx context.Context, bucketName string, filePath string) (io.Reader, error) {
 	logger.Default.Logf(t, "Reading object from bucket %s using path %s", bucketName, filePath)
 
-	ctx := context.Background()
-
-	client, err := newStorageClient()
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	bucket := client.Bucket(bucketName)
+
 	r, err := bucket.Object(filePath).NewReader(ctx)
 	if err != nil {
 		return nil, err
@@ -90,16 +145,35 @@ func ReadBucketObjectE(t testing.TestingT, bucketName string, filePath string) (
 }
 
 // WriteBucketObject writes an object to the given Storage Bucket and returns its URL.
+// This will fail the test if there is an error.
+//
+// Deprecated: Use [WriteBucketObjectContext] instead.
 func WriteBucketObject(t testing.TestingT, bucketName string, filePath string, body io.Reader, contentType string) string {
-	out, err := WriteBucketObjectE(t, bucketName, filePath, body, contentType)
+	return WriteBucketObjectContext(t, context.Background(), bucketName, filePath, body, contentType)
+}
+
+// WriteBucketObjectContext writes an object to the given Storage Bucket and returns its URL.
+// This will fail the test if there is an error.
+// The ctx parameter supports cancellation and timeouts.
+func WriteBucketObjectContext(t testing.TestingT, ctx context.Context, bucketName string, filePath string, body io.Reader, contentType string) string {
+	out, err := WriteBucketObjectContextE(t, ctx, bucketName, filePath, body, contentType)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return out
 }
 
 // WriteBucketObjectE writes an object to the given Storage Bucket and returns its URL.
+//
+// Deprecated: Use [WriteBucketObjectContextE] instead.
 func WriteBucketObjectE(t testing.TestingT, bucketName string, filePath string, body io.Reader, contentType string) (string, error) {
+	return WriteBucketObjectContextE(t, context.Background(), bucketName, filePath, body, contentType)
+}
+
+// WriteBucketObjectContextE writes an object to the given Storage Bucket and returns its URL.
+// The ctx parameter supports cancellation and timeouts.
+func WriteBucketObjectContextE(t testing.TestingT, ctx context.Context, bucketName string, filePath string, body io.Reader, contentType string) (string, error) {
 	// set a default content type
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -107,9 +181,7 @@ func WriteBucketObjectE(t testing.TestingT, bucketName string, filePath string, 
 
 	logger.Default.Logf(t, "Writing object to bucket %s using path %s and content type %s", bucketName, filePath, contentType)
 
-	ctx := context.Background()
-
-	client, err := newStorageClient()
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -118,36 +190,54 @@ func WriteBucketObjectE(t testing.TestingT, bucketName string, filePath string, 
 	w.ContentType = contentType
 
 	// Don't set any ACL or cache control properties for now
-	//w.ACL = []storage.ACLRule{{Entity: storage.AllAuthenticatedUsers, Role: storage.RoleReader}}
+	// w.ACL = []storage.ACLRule{{Entity: storage.AllAuthenticatedUsers, Role: storage.RoleReader}}
 	// set a default cache control (1 day)
-	//w.CacheControl = "public, max-age=86400"
+	// w.CacheControl = "public, max-age=86400"
 
 	if _, err := io.Copy(w, body); err != nil {
 		return "", err
 	}
+
 	if err := w.Close(); err != nil {
 		return "", err
 	}
 
 	const publicURL = "https://storage.googleapis.com/%s/%s"
+
 	return fmt.Sprintf(publicURL, bucketName, filePath), nil
 }
 
 // EmptyStorageBucket removes the contents of a storage bucket with the given name.
+// This will fail the test if there is an error.
+//
+// Deprecated: Use [EmptyStorageBucketContext] instead.
 func EmptyStorageBucket(t testing.TestingT, name string) {
-	err := EmptyStorageBucketE(t, name)
+	EmptyStorageBucketContext(t, context.Background(), name)
+}
+
+// EmptyStorageBucketContext removes the contents of a storage bucket with the given name.
+// This will fail the test if there is an error.
+// The ctx parameter supports cancellation and timeouts.
+func EmptyStorageBucketContext(t testing.TestingT, ctx context.Context, name string) {
+	err := EmptyStorageBucketContextE(t, ctx, name)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 // EmptyStorageBucketE removes the contents of a storage bucket with the given name.
+//
+// Deprecated: Use [EmptyStorageBucketContextE] instead.
 func EmptyStorageBucketE(t testing.TestingT, name string) error {
+	return EmptyStorageBucketContextE(t, context.Background(), name)
+}
+
+// EmptyStorageBucketContextE removes the contents of a storage bucket with the given name.
+// The ctx parameter supports cancellation and timeouts.
+func EmptyStorageBucketContextE(t testing.TestingT, ctx context.Context, name string) error {
 	logger.Default.Logf(t, "Emptying storage bucket %s", name)
 
-	ctx := context.Background()
-
-	client, err := newStorageClient()
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -157,11 +247,13 @@ func EmptyStorageBucketE(t testing.TestingT, name string) error {
 	// TODO - we should really do a bulk delete call here, but I couldn't find
 	// anything in the SDK.
 	bucket := client.Bucket(name)
+
 	it := bucket.Objects(ctx, nil)
+
 	for {
 		objectAttrs, err := it.Next()
 
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
 
@@ -171,6 +263,7 @@ func EmptyStorageBucketE(t testing.TestingT, name string) error {
 
 		// purge the object
 		logger.Default.Logf(t, "Deleting storage bucket object %s", objectAttrs.Name)
+
 		if err := bucket.Object(objectAttrs.Name).Delete(ctx); err != nil {
 			return err
 		}
@@ -180,21 +273,35 @@ func EmptyStorageBucketE(t testing.TestingT, name string) error {
 }
 
 // AssertStorageBucketExists checks if the given storage bucket exists and fails the test if it does not.
+//
+// Deprecated: Use [AssertStorageBucketExistsContext] instead.
 func AssertStorageBucketExists(t testing.TestingT, name string) {
-	err := AssertStorageBucketExistsE(t, name)
+	AssertStorageBucketExistsContext(t, context.Background(), name)
+}
+
+// AssertStorageBucketExistsContext checks if the given storage bucket exists and fails the test if it does not.
+// The ctx parameter supports cancellation and timeouts.
+func AssertStorageBucketExistsContext(t testing.TestingT, ctx context.Context, name string) {
+	err := AssertStorageBucketExistsContextE(t, ctx, name)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 // AssertStorageBucketExistsE checks if the given storage bucket exists and returns an error if it does not.
+//
+// Deprecated: Use [AssertStorageBucketExistsContextE] instead.
 func AssertStorageBucketExistsE(t testing.TestingT, name string) error {
+	return AssertStorageBucketExistsContextE(t, context.Background(), name)
+}
+
+// AssertStorageBucketExistsContextE checks if the given storage bucket exists and returns an error if it does not.
+// The ctx parameter supports cancellation and timeouts.
+func AssertStorageBucketExistsContextE(t testing.TestingT, ctx context.Context, name string) error {
 	logger.Default.Logf(t, "Finding bucket %s", name)
 
-	ctx := context.Background()
-
 	// Creates a client.
-	client, err := newStorageClient()
+	client, err := newStorageClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -213,18 +320,19 @@ func AssertStorageBucketExistsE(t testing.TestingT, name string) error {
 	}
 
 	it := bucket.Objects(ctx, nil)
-	if _, err := it.Next(); err == storage.ErrBucketNotExist {
+
+	if _, err := it.Next(); errors.Is(err, storage.ErrBucketNotExist) {
 		return err
 	}
 
 	return nil
 }
 
-func newStorageClient() (*storage.Client, error) {
-	ctx := context.Background()
+func newStorageClient(ctx context.Context) (*storage.Client, error) {
 	client, err := storage.NewClient(ctx, withOptions()...)
 	if err != nil {
 		return nil, err
 	}
+
 	return client, nil
 }
