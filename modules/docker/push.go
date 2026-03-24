@@ -10,12 +10,26 @@ import (
 )
 
 // Push runs the 'docker push' command to push the given tag. This will fail the test if there are any errors.
+//
+// Deprecated: Use [PushContext] instead.
 func Push(t testing.TestingT, logger *logger.Logger, tag string) {
-	require.NoError(t, PushE(t, logger, tag))
+	PushContext(t, context.Background(), logger, tag)
+}
+
+// PushContext is like [Push] but includes a context.
+func PushContext(t testing.TestingT, ctx context.Context, logger *logger.Logger, tag string) {
+	require.NoError(t, PushContextE(t, ctx, logger, tag))
 }
 
 // PushE runs the 'docker push' command to push the given tag.
+//
+// Deprecated: Use [PushContextE] instead.
 func PushE(t testing.TestingT, logger *logger.Logger, tag string) error {
+	return PushContextE(t, context.Background(), logger, tag)
+}
+
+// PushContextE is like [PushE] but includes a context.
+func PushContextE(t testing.TestingT, ctx context.Context, logger *logger.Logger, tag string) error {
 	logger.Logf(t, "Running 'docker push' for tag %s", tag)
 
 	cmd := &shell.Command{
@@ -24,5 +38,5 @@ func PushE(t testing.TestingT, logger *logger.Logger, tag string) error {
 		Logger:  logger,
 	}
 
-	return shell.RunCommandContextE(t, context.Background(), cmd)
+	return shell.RunCommandContextE(t, ctx, cmd)
 }

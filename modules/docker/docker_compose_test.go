@@ -21,8 +21,11 @@ func TestDockerComposeWithBuildKit(t *testing.T) {
 		},
 		EnableBuildKit: true,
 	}
-	docker.RunDockerCompose(t, dockerOptions, "build", "--no-cache")
-	out := docker.RunDockerCompose(t, dockerOptions, "up")
+
+	ctx := t.Context()
+	docker.RunDockerComposeContext(t, ctx, dockerOptions, "build", "--no-cache")
+
+	out := docker.RunDockerComposeContext(t, ctx, dockerOptions, "up")
 
 	require.Contains(t, out, testToken)
 }
@@ -57,8 +60,10 @@ func TestDockerComposeWithCustomProjectName(t *testing.T) {
 			t.Parallel()
 			t.Log(test.name)
 
-			output := docker.RunDockerCompose(t, test.options, "up", "-d")
-			defer docker.RunDockerCompose(t, test.options, "down", "--remove-orphans", "--timeout", "2")
+			ctx := t.Context()
+
+			output := docker.RunDockerComposeContext(t, ctx, test.options, "up", "-d")
+			defer docker.RunDockerComposeContext(t, ctx, test.options, "down", "--remove-orphans", "--timeout", "2")
 
 			require.Contains(t, output, test.expected)
 		})

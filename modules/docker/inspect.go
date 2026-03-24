@@ -122,10 +122,19 @@ type inspectOutput struct {
 
 // Inspect runs the 'docker inspect {container id}' command and returns a ContainerInspect
 // struct, converted from the output JSON, along with any errors
+//
+// Deprecated: Use [InspectContext] instead.
 func Inspect(t *testing.T, id string) *ContainerInspect {
 	t.Helper()
 
-	out, err := InspectE(t, id)
+	return InspectContext(t, context.Background(), id)
+}
+
+// InspectContext is like [Inspect] but includes a context.
+func InspectContext(t *testing.T, ctx context.Context, id string) *ContainerInspect {
+	t.Helper()
+
+	out, err := InspectContextE(t, ctx, id)
 	require.NoError(t, err)
 
 	return out
@@ -133,7 +142,16 @@ func Inspect(t *testing.T, id string) *ContainerInspect {
 
 // InspectE runs the 'docker inspect {container id}' command and returns a ContainerInspect
 // struct, converted from the output JSON, along with any errors
+//
+// Deprecated: Use [InspectContextE] instead.
 func InspectE(t *testing.T, id string) (*ContainerInspect, error) {
+	t.Helper()
+
+	return InspectContextE(t, context.Background(), id)
+}
+
+// InspectContextE is like [InspectE] but includes a context.
+func InspectContextE(t *testing.T, ctx context.Context, id string) (*ContainerInspect, error) {
 	t.Helper()
 
 	cmd := &shell.Command{
@@ -143,7 +161,7 @@ func InspectE(t *testing.T, id string) (*ContainerInspect, error) {
 		Logger: logger.Discard,
 	}
 
-	out, err := shell.RunCommandContextAndGetStdOutE(t, context.Background(), cmd)
+	out, err := shell.RunCommandContextAndGetStdOutE(t, ctx, cmd)
 	if err != nil {
 		return nil, err
 	}

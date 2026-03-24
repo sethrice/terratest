@@ -1,7 +1,6 @@
 package docker_test
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -23,9 +22,10 @@ func TestBuild(t *testing.T) {
 		BuildArgs: []string{"text=" + text},
 	}
 
-	docker.Build(t, "../../test/fixtures/docker", options)
+	ctx := t.Context()
+	docker.BuildContext(t, ctx, "../../test/fixtures/docker", options)
 
-	out := docker.Run(t, tag, &docker.RunOptions{Remove: true})
+	out := docker.RunContext(t, ctx, tag, &docker.RunOptions{Remove: true})
 	require.Contains(t, out, text)
 }
 
@@ -41,8 +41,10 @@ func TestBuildWithBuildKit(t *testing.T) {
 		Env:            map[string]string{"GITHUB_OAUTH_TOKEN": testToken},
 	}
 
-	docker.Build(t, "../../test/fixtures/docker-with-buildkit", options)
-	out := docker.Run(t, tag, &docker.RunOptions{Remove: false})
+	ctx := t.Context()
+	docker.BuildContext(t, ctx, "../../test/fixtures/docker-with-buildkit", options)
+
+	out := docker.RunContext(t, ctx, tag, &docker.RunOptions{Remove: false})
 	require.Contains(t, out, testToken)
 }
 
@@ -59,8 +61,10 @@ func TestBuildMultiArch(t *testing.T) {
 		Load:          true,
 	}
 
-	docker.Build(t, "../../test/fixtures/docker", options)
-	out := docker.Run(t, tag, &docker.RunOptions{Remove: true})
+	ctx := t.Context()
+	docker.BuildContext(t, ctx, "../../test/fixtures/docker", options)
+
+	out := docker.RunContext(t, ctx, tag, &docker.RunOptions{Remove: true})
 	require.Contains(t, out, text)
 }
 
@@ -77,9 +81,10 @@ func TestBuildWithTarget(t *testing.T) {
 		Target:    "step1",
 	}
 
-	docker.Build(t, "../../test/fixtures/docker", options)
+	ctx := t.Context()
+	docker.BuildContext(t, ctx, "../../test/fixtures/docker", options)
 
-	out := docker.Run(t, tag, &docker.RunOptions{Remove: true})
+	out := docker.RunContext(t, ctx, tag, &docker.RunOptions{Remove: true})
 	require.Contains(t, out, text1)
 }
 
@@ -95,15 +100,17 @@ func TestGitCloneAndBuild(t *testing.T) {
 		BuildArgs: []string{"text=" + text},
 	}
 
-	gitBranchName := git.GetCurrentBranchNameContext(t, context.Background(), "")
+	ctx := t.Context()
+
+	gitBranchName := git.GetCurrentBranchNameContext(t, ctx, "")
 	if gitBranchName == "" {
 		logger.Default.Logf(t, "WARNING: git.GetCurrentBranchNameContext returned an empty string; falling back to main")
 
 		gitBranchName = "main"
 	}
 
-	docker.GitCloneAndBuild(t, "git@github.com:gruntwork-io/terratest.git", gitBranchName, "test/fixtures/docker", buildOpts)
+	docker.GitCloneAndBuildContext(t, ctx, "git@github.com:gruntwork-io/terratest.git", gitBranchName, "test/fixtures/docker", buildOpts)
 
-	out := docker.Run(t, imageTag, &docker.RunOptions{Remove: true})
+	out := docker.RunContext(t, ctx, imageTag, &docker.RunOptions{Remove: true})
 	require.Contains(t, out, text)
 }

@@ -62,12 +62,26 @@ type BuildOptions struct {
 
 // Build runs the 'docker build' command at the given path with the given options and fails the test if there are any
 // errors.
+//
+// Deprecated: Use [BuildContext] instead.
 func Build(t testing.TestingT, path string, options *BuildOptions) {
-	require.NoError(t, BuildE(t, path, options))
+	BuildContext(t, context.Background(), path, options)
+}
+
+// BuildContext is like [Build] but includes a context.
+func BuildContext(t testing.TestingT, ctx context.Context, path string, options *BuildOptions) {
+	require.NoError(t, BuildContextE(t, ctx, path, options))
 }
 
 // BuildE runs the 'docker build' command at the given path with the given options and returns any errors.
+//
+// Deprecated: Use [BuildContextE] instead.
 func BuildE(t testing.TestingT, path string, options *BuildOptions) error {
+	return BuildContextE(t, context.Background(), path, options)
+}
+
+// BuildContextE is like [BuildE] but includes a context.
+func BuildContextE(t testing.TestingT, ctx context.Context, path string, options *BuildOptions) error {
 	options.Logger.Logf(t, "Running 'docker build' in %s", path)
 
 	env := make(map[string]string)
@@ -86,7 +100,7 @@ func BuildE(t testing.TestingT, path string, options *BuildOptions) error {
 		Env:     env,
 	}
 
-	if err := shell.RunCommandContextE(t, context.Background(), cmd); err != nil {
+	if err := shell.RunCommandContextE(t, ctx, cmd); err != nil {
 		return err
 	}
 
@@ -96,7 +110,7 @@ func BuildE(t testing.TestingT, path string, options *BuildOptions) error {
 		errorsOccurred := new(multierror.Error)
 
 		for _, tag := range options.Tags {
-			if err := PushE(t, options.Logger, tag); err != nil {
+			if err := PushContextE(t, ctx, options.Logger, tag); err != nil {
 				options.Logger.Logf(t, "ERROR: error pushing tag %s", tag)
 
 				errorsOccurred = multierror.Append(errorsOccurred, err)
@@ -114,7 +128,7 @@ func BuildE(t testing.TestingT, path string, options *BuildOptions) error {
 			Logger:  options.Logger,
 		}
 
-		return shell.RunCommandContextE(t, context.Background(), loadCmd)
+		return shell.RunCommandContextE(t, ctx, loadCmd)
 	}
 
 	return nil
@@ -123,6 +137,8 @@ func BuildE(t testing.TestingT, path string, options *BuildOptions) error {
 // GitCloneAndBuild builds a new Docker image from a given Git repo. This function will clone the given repo at the
 // specified ref, and call the docker build command on the cloned repo from the given relative path (relative to repo
 // root). This will fail the test if there are any errors.
+//
+// Deprecated: Use [GitCloneAndBuildContext] instead.
 func GitCloneAndBuild(
 	t testing.TestingT,
 	repo string,
@@ -130,14 +146,40 @@ func GitCloneAndBuild(
 	path string,
 	dockerBuildOpts *BuildOptions,
 ) {
-	require.NoError(t, GitCloneAndBuildE(t, repo, ref, path, dockerBuildOpts))
+	GitCloneAndBuildContext(t, context.Background(), repo, ref, path, dockerBuildOpts)
+}
+
+// GitCloneAndBuildContext is like [GitCloneAndBuild] but includes a context.
+func GitCloneAndBuildContext(
+	t testing.TestingT,
+	ctx context.Context,
+	repo string,
+	ref string,
+	path string,
+	dockerBuildOpts *BuildOptions,
+) {
+	require.NoError(t, GitCloneAndBuildContextE(t, ctx, repo, ref, path, dockerBuildOpts))
 }
 
 // GitCloneAndBuildE builds a new Docker image from a given Git repo. This function will clone the given repo at the
 // specified ref, and call the docker build command on the cloned repo from the given relative path (relative to repo
 // root).
+//
+// Deprecated: Use [GitCloneAndBuildContextE] instead.
 func GitCloneAndBuildE(
 	t testing.TestingT,
+	repo string,
+	ref string,
+	path string,
+	dockerBuildOpts *BuildOptions,
+) error {
+	return GitCloneAndBuildContextE(t, context.Background(), repo, ref, path, dockerBuildOpts)
+}
+
+// GitCloneAndBuildContextE is like [GitCloneAndBuildE] but includes a context.
+func GitCloneAndBuildContextE(
+	t testing.TestingT,
+	ctx context.Context,
 	repo string,
 	ref string,
 	path string,
@@ -159,7 +201,7 @@ func GitCloneAndBuildE(
 		Args:    []string{"clone", repo, workingDir},
 	}
 
-	if err := shell.RunCommandContextE(t, context.Background(), cloneCmd); err != nil {
+	if err := shell.RunCommandContextE(t, ctx, cloneCmd); err != nil {
 		return err
 	}
 
@@ -169,13 +211,13 @@ func GitCloneAndBuildE(
 		WorkingDir: workingDir,
 	}
 
-	if err := shell.RunCommandContextE(t, context.Background(), checkoutCmd); err != nil {
+	if err := shell.RunCommandContextE(t, ctx, checkoutCmd); err != nil {
 		return err
 	}
 
 	contextPath := filepath.Join(workingDir, path)
 
-	return BuildE(t, contextPath, dockerBuildOpts)
+	return BuildContextE(t, ctx, contextPath, dockerBuildOpts)
 }
 
 // formatDockerBuildArgs formats the arguments for the 'docker build' command.

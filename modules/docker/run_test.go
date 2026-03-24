@@ -17,6 +17,6 @@ func TestRun(t *testing.T) {
 		Remove:               true,
 	}
 
-	out := docker.Run(t, "alpine:3.7", options)
+	out := docker.RunContext(t, t.Context(), "alpine:3.7", options)
 	require.Contains(t, out, "Hello, World!")
 }

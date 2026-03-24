@@ -25,8 +25,15 @@ type Options struct {
 }
 
 // RunDockerCompose runs docker compose with the given arguments and options and return stdout/stderr.
+//
+// Deprecated: Use [RunDockerComposeContext] instead.
 func RunDockerCompose(t testing.TestingT, options *Options, args ...string) string {
-	out, err := runDockerComposeE(t, false, options, args...)
+	return RunDockerComposeContext(t, context.Background(), options, args...)
+}
+
+// RunDockerComposeContext is like [RunDockerCompose] but includes a context.
+func RunDockerComposeContext(t testing.TestingT, ctx context.Context, options *Options, args ...string) string {
+	out, err := runDockerComposeE(t, ctx, false, options, args...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,19 +42,33 @@ func RunDockerCompose(t testing.TestingT, options *Options, args ...string) stri
 }
 
 // RunDockerComposeAndGetStdOut runs docker compose with the given arguments and options and returns only stdout.
+//
+// Deprecated: Use [RunDockerComposeAndGetStdOutContext] instead.
 func RunDockerComposeAndGetStdOut(t testing.TestingT, options *Options, args ...string) string {
-	out, err := runDockerComposeE(t, true, options, args...)
+	return RunDockerComposeAndGetStdOutContext(t, context.Background(), options, args...)
+}
+
+// RunDockerComposeAndGetStdOutContext is like [RunDockerComposeAndGetStdOut] but includes a context.
+func RunDockerComposeAndGetStdOutContext(t testing.TestingT, ctx context.Context, options *Options, args ...string) string {
+	out, err := runDockerComposeE(t, ctx, true, options, args...)
 	require.NoError(t, err)
 
 	return out
 }
 
 // RunDockerComposeE runs docker compose with the given arguments and options and return stdout/stderr.
+//
+// Deprecated: Use [RunDockerComposeContextE] instead.
 func RunDockerComposeE(t testing.TestingT, options *Options, args ...string) (string, error) {
-	return runDockerComposeE(t, false, options, args...)
+	return RunDockerComposeContextE(t, context.Background(), options, args...)
 }
 
-func runDockerComposeE(t testing.TestingT, stdout bool, options *Options, args ...string) (string, error) {
+// RunDockerComposeContextE is like [RunDockerComposeE] but includes a context.
+func RunDockerComposeContextE(t testing.TestingT, ctx context.Context, options *Options, args ...string) (string, error) {
+	return runDockerComposeE(t, ctx, false, options, args...)
+}
+
+func runDockerComposeE(t testing.TestingT, ctx context.Context, stdout bool, options *Options, args ...string) (string, error) {
 	var cmd *shell.Command
 
 	projectName := options.ProjectName
@@ -88,10 +109,10 @@ func runDockerComposeE(t testing.TestingT, stdout bool, options *Options, args .
 	}
 
 	if stdout {
-		return shell.RunCommandContextAndGetStdOut(t, context.Background(), cmd), nil
+		return shell.RunCommandContextAndGetStdOut(t, ctx, cmd), nil
 	}
 
-	return shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
+	return shell.RunCommandContextAndGetOutputE(t, ctx, cmd)
 }
 
 // generateValidDockerComposeProjectName generates a valid project name for docker-compose.

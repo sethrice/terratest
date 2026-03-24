@@ -17,6 +17,8 @@ const dockerInspectTestImage = "nginx:1.17-alpine"
 func TestInspect(t *testing.T) {
 	t.Parallel()
 
+	ctx := t.Context()
+
 	// append timestamp to container name to allow running tests in parallel
 	name := "inspect-test-" + random.UniqueID()
 
@@ -26,10 +28,10 @@ func TestInspect(t *testing.T) {
 		Name:   name,
 	}
 
-	id := docker.RunAndGetID(t, dockerInspectTestImage, options)
-	defer removeContainer(t, id)
+	id := docker.RunAndGetIDContext(t, ctx, dockerInspectTestImage, options)
+	defer removeContainer(t, ctx, id)
 
-	c := docker.Inspect(t, id)
+	c := docker.InspectContext(t, ctx, id)
 
 	require.Equal(t, id, c.ID)
 	require.Equal(t, name, c.Name)
@@ -40,6 +42,8 @@ func TestInspect(t *testing.T) {
 func TestInspectWithExposedPort(t *testing.T) {
 	t.Parallel()
 
+	ctx := t.Context()
+
 	// choosing an unique high port to avoid conflict on test machines
 	port := 13031
 
@@ -48,10 +52,10 @@ func TestInspectWithExposedPort(t *testing.T) {
 		OtherOptions: []string{fmt.Sprintf("-p=%d:80", port)},
 	}
 
-	id := docker.RunAndGetID(t, dockerInspectTestImage, options)
-	defer removeContainer(t, id)
+	id := docker.RunAndGetIDContext(t, ctx, dockerInspectTestImage, options)
+	defer removeContainer(t, ctx, id)
 
-	c := docker.Inspect(t, id)
+	c := docker.InspectContext(t, ctx, id)
 
 	require.NotEmptyf(t, c.Ports, "Container's exposed ports should not be empty")
 	require.EqualValues(t, 80, c.Ports[0].ContainerPort)
@@ -60,6 +64,8 @@ func TestInspectWithExposedPort(t *testing.T) {
 
 func TestInspectWithRandomExposedPort(t *testing.T) {
 	t.Parallel()
+
+	ctx := t.Context()
 
 	var expectedPort uint16 = 80
 
@@ -70,10 +76,10 @@ func TestInspectWithRandomExposedPort(t *testing.T) {
 		OtherOptions: []string{"-P"},
 	}
 
-	id := docker.RunAndGetID(t, dockerInspectTestImage, options)
-	defer removeContainer(t, id)
+	id := docker.RunAndGetIDContext(t, ctx, dockerInspectTestImage, options)
+	defer removeContainer(t, ctx, id)
 
-	c := docker.Inspect(t, id)
+	c := docker.InspectContext(t, ctx, id)
 
 	require.NotEmptyf(t, c.Ports, "Container's exposed ports should not be empty")
 	require.NotEqualf(t, uint16(0), c.GetExposedHostPort(expectedPort), "There are no exposed port %d!", expectedPort)
@@ -111,14 +117,14 @@ func TestInspectWithNamedVolume(t *testing.T) {
 func TestInspectWithInvalidContainerID(t *testing.T) {
 	t.Parallel()
 
-	_, err := docker.InspectE(t, "This is not a valid container ID")
+	_, err := docker.InspectContextE(t, t.Context(), "This is not a valid container ID")
 	require.Error(t, err)
 }
 
 func TestInspectWithUnknownContainerID(t *testing.T) {
 	t.Parallel()
 
-	_, err := docker.InspectE(t, "abcde123456")
+	_, err := docker.InspectContextE(t, t.Context(), "abcde123456")
 	require.Error(t, err)
 }
 
@@ -147,6 +153,8 @@ func TestInspectReturnsCorrectHealthCheckWhenUnhealthy(t *testing.T) {
 func runWithHealthCheck(t *testing.T, check string, frequency time.Duration, delay time.Duration) *docker.ContainerInspect {
 	t.Helper()
 
+	ctx := t.Context()
+
 	// append timestamp to container name to allow running tests in parallel
 	name := "inspect-test-" + random.UniqueID()
 
@@ -160,29 +168,31 @@ func runWithHealthCheck(t *testing.T, check string, frequency time.Duration, del
 		},
 	}
 
-	id := docker.RunAndGetID(t, dockerInspectTestImage, options)
-	defer removeContainer(t, id)
+	id := docker.RunAndGetIDContext(t, ctx, dockerInspectTestImage, options)
+	defer removeContainer(t, ctx, id)
 
 	time.Sleep(delay)
 
-	return docker.Inspect(t, id)
+	return docker.InspectContext(t, ctx, id)
 }
 
 func runWithVolume(t *testing.T, volume string) *docker.ContainerInspect {
 	t.Helper()
+
+	ctx := t.Context()
 
 	options := &docker.RunOptions{
 		Detach:  true,
 		Volumes: []string{volume},
 	}
 
-	id := docker.RunAndGetID(t, dockerInspectTestImage, options)
-	defer removeContainer(t, id)
+	id := docker.RunAndGetIDContext(t, ctx, dockerInspectTestImage, options)
+	defer removeContainer(t, ctx, id)
 
-	return docker.Inspect(t, id)
+	return docker.InspectContext(t, ctx, id)
 }
 
-func removeContainer(t *testing.T, id string) {
+func removeContainer(t *testing.T, ctx context.Context, id string) {
 	t.Helper()
 
 	cmd := &shell.Command{
@@ -190,5 +200,5 @@ func removeContainer(t *testing.T, id string) {
 		Args:    []string{"container", "rm", "--force", id},
 	}
 
-	shell.RunCommandContext(t, context.Background(), cmd)
+	shell.RunCommandContext(t, ctx, cmd)
 }

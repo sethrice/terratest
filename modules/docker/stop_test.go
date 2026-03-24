@@ -1,7 +1,6 @@
 package docker_test
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"strconv"
@@ -17,6 +16,8 @@ import (
 
 func TestStop(t *testing.T) {
 	t.Parallel()
+
+	ctx := t.Context()
 
 	// appending timestamp to container name to run tests in parallel
 	name := "test-nginx" + strconv.FormatInt(time.Now().UnixNano(), 10)
@@ -35,13 +36,14 @@ func TestStop(t *testing.T) {
 		Remove:       true,
 		OtherOptions: []string{"-p", port + ":80"},
 	}
-	docker.Run(t, "nginx:1.17-alpine", runOpts)
+
+	docker.RunContext(t, ctx, "nginx:1.17-alpine", runOpts)
 
 	// verify nginx is running
 	http_helper.HttpGetWithRetryWithCustomValidation(t, testURL, &tls.Config{}, 60, 2*time.Second, verifyNginxIsUp)
 
 	// try to stop it now
-	out := docker.Stop(t, []string{name}, &docker.StopOptions{})
+	out := docker.StopContext(t, ctx, []string{name}, &docker.StopOptions{})
 	require.Contains(t, out, name)
 
 	// verify nginx is down
@@ -50,7 +52,8 @@ func TestStop(t *testing.T) {
 		Command: "docker",
 		Args:    []string{"ps", "-q", "--filter", "name=" + name},
 	}
-	output := shell.RunCommandContextAndGetStdOut(t, context.Background(), command)
+
+	output := shell.RunCommandContextAndGetStdOut(t, ctx, command)
 	require.Empty(t, output)
 }
 

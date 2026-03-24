@@ -59,15 +59,29 @@ type RunOptions struct {
 
 // Run runs the 'docker run' command on the given image with the given options and return stdout/stderr. This method
 // fails the test if there are any errors.
+//
+// Deprecated: Use [RunContext] instead.
 func Run(t testing.TestingT, image string, options *RunOptions) string {
-	out, err := RunE(t, image, options)
+	return RunContext(t, context.Background(), image, options)
+}
+
+// RunContext is like [Run] but includes a context.
+func RunContext(t testing.TestingT, ctx context.Context, image string, options *RunOptions) string {
+	out, err := RunContextE(t, ctx, image, options)
 	require.NoError(t, err)
 
 	return out
 }
 
 // RunE runs the 'docker run' command on the given image with the given options and return stdout/stderr, or any error.
+//
+// Deprecated: Use [RunContextE] instead.
 func RunE(t testing.TestingT, image string, options *RunOptions) (string, error) {
+	return RunContextE(t, context.Background(), image, options)
+}
+
+// RunContextE is like [RunE] but includes a context.
+func RunContextE(t testing.TestingT, ctx context.Context, image string, options *RunOptions) (string, error) {
 	options.Logger.Logf(t, "Running 'docker run' on image '%s'", image)
 
 	args := formatDockerRunArgs(image, options)
@@ -78,13 +92,20 @@ func RunE(t testing.TestingT, image string, options *RunOptions) (string, error)
 		Logger:  options.Logger,
 	}
 
-	return shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
+	return shell.RunCommandContextAndGetOutputE(t, ctx, cmd)
 }
 
 // RunAndGetID runs the 'docker run' command on the given image with the given options and returns the container ID
 // that is returned in stdout. This method fails the test if there are any errors.
+//
+// Deprecated: Use [RunAndGetIDContext] instead.
 func RunAndGetID(t testing.TestingT, image string, options *RunOptions) string {
-	out, err := RunAndGetIDE(t, image, options)
+	return RunAndGetIDContext(t, context.Background(), image, options)
+}
+
+// RunAndGetIDContext is like [RunAndGetID] but includes a context.
+func RunAndGetIDContext(t testing.TestingT, ctx context.Context, image string, options *RunOptions) string {
+	out, err := RunAndGetIDContextE(t, ctx, image, options)
 	require.NoError(t, err)
 
 	return out
@@ -92,7 +113,14 @@ func RunAndGetID(t testing.TestingT, image string, options *RunOptions) string {
 
 // RunAndGetIDE runs the 'docker run' command on the given image with the given options and returns the container ID
 // that is returned in stdout, or any error.
+//
+// Deprecated: Use [RunAndGetIDContextE] instead.
 func RunAndGetIDE(t testing.TestingT, image string, options *RunOptions) (string, error) {
+	return RunAndGetIDContextE(t, context.Background(), image, options)
+}
+
+// RunAndGetIDContextE is like [RunAndGetIDE] but includes a context.
+func RunAndGetIDContextE(t testing.TestingT, ctx context.Context, image string, options *RunOptions) (string, error) {
 	options.Logger.Logf(t, "Running 'docker run' on image '%s', returning stdout", image)
 
 	args := formatDockerRunArgs(image, options)
@@ -103,7 +131,7 @@ func RunAndGetIDE(t testing.TestingT, image string, options *RunOptions) (string
 		Logger:  options.Logger,
 	}
 
-	return shell.RunCommandContextAndGetStdOutE(t, context.Background(), cmd)
+	return shell.RunCommandContextAndGetStdOutE(t, ctx, cmd)
 }
 
 // formatDockerRunArgs formats the arguments for the 'docker run' command.

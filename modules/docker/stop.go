@@ -21,15 +21,29 @@ type StopOptions struct {
 
 // Stop runs the 'docker stop' command for the given containers and return the stdout/stderr. This method fails
 // the test if there are any errors
+//
+// Deprecated: Use [StopContext] instead.
 func Stop(t testing.TestingT, containers []string, options *StopOptions) string {
-	out, err := StopE(t, containers, options)
+	return StopContext(t, context.Background(), containers, options)
+}
+
+// StopContext is like [Stop] but includes a context.
+func StopContext(t testing.TestingT, ctx context.Context, containers []string, options *StopOptions) string {
+	out, err := StopContextE(t, ctx, containers, options)
 	require.NoError(t, err)
 
 	return out
 }
 
 // StopE runs the 'docker stop' command for the given containers and returns any errors.
+//
+// Deprecated: Use [StopContextE] instead.
 func StopE(t testing.TestingT, containers []string, options *StopOptions) (string, error) {
+	return StopContextE(t, context.Background(), containers, options)
+}
+
+// StopContextE is like [StopE] but includes a context.
+func StopContextE(t testing.TestingT, ctx context.Context, containers []string, options *StopOptions) (string, error) {
 	options.Logger.Logf(t, "Running 'docker stop' on containers '%s'", containers)
 
 	args := formatDockerStopArgs(containers, options)
@@ -40,7 +54,7 @@ func StopE(t testing.TestingT, containers []string, options *StopOptions) (strin
 		Logger:  options.Logger,
 	}
 
-	return shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
+	return shell.RunCommandContextAndGetOutputE(t, ctx, cmd)
 }
 
 // formatDockerStopArgs formats the arguments for the 'docker stop' command

@@ -21,9 +21,11 @@ func TestListImagesAndDeleteImage(t *testing.T) {
 	options := &docker.BuildOptions{
 		Tags: []string{img},
 	}
-	docker.Build(t, "../../test/fixtures/docker", options)
 
-	assert.True(t, docker.DoesImageExist(t, img, nil))
-	docker.DeleteImage(t, img, nil)
-	assert.False(t, docker.DoesImageExist(t, img, nil))
+	ctx := t.Context()
+	docker.BuildContext(t, ctx, "../../test/fixtures/docker", options)
+
+	assert.True(t, docker.DoesImageExistContext(t, ctx, img, nil))
+	docker.DeleteImageContext(t, ctx, img, nil)
+	assert.False(t, docker.DoesImageExistContext(t, ctx, img, nil))
 }

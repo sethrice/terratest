@@ -54,38 +54,66 @@ func (image Image) String() string {
 }
 
 // DeleteImage removes a docker image using the Docker CLI. This will fail the test if there is an error.
+//
+// Deprecated: Use [DeleteImageContext] instead.
 func DeleteImage(t testing.TestingT, img string, logger *logger.Logger) {
-	require.NoError(t, DeleteImageE(t, img, logger))
+	DeleteImageContext(t, context.Background(), img, logger)
+}
+
+// DeleteImageContext is like [DeleteImage] but includes a context.
+func DeleteImageContext(t testing.TestingT, ctx context.Context, img string, logger *logger.Logger) {
+	require.NoError(t, DeleteImageContextE(t, ctx, img, logger))
 }
 
 // DeleteImageE removes a docker image using the Docker CLI.
+//
+// Deprecated: Use [DeleteImageContextE] instead.
 func DeleteImageE(t testing.TestingT, img string, logger *logger.Logger) error {
+	return DeleteImageContextE(t, context.Background(), img, logger)
+}
+
+// DeleteImageContextE is like [DeleteImageE] but includes a context.
+func DeleteImageContextE(t testing.TestingT, ctx context.Context, img string, logger *logger.Logger) error {
 	cmd := &shell.Command{
 		Command: "docker",
 		Args:    []string{"rmi", img},
 		Logger:  logger,
 	}
 
-	return shell.RunCommandContextE(t, context.Background(), cmd)
+	return shell.RunCommandContextE(t, ctx, cmd)
 }
 
 // ListImages calls docker images using the Docker CLI to list the available images on the local docker daemon.
+//
+// Deprecated: Use [ListImagesContext] instead.
 func ListImages(t testing.TestingT, logger *logger.Logger) []Image {
-	out, err := ListImagesE(t, logger)
+	return ListImagesContext(t, context.Background(), logger)
+}
+
+// ListImagesContext is like [ListImages] but includes a context.
+func ListImagesContext(t testing.TestingT, ctx context.Context, logger *logger.Logger) []Image {
+	out, err := ListImagesContextE(t, ctx, logger)
 	require.NoError(t, err)
 
 	return out
 }
 
 // ListImagesE calls docker images using the Docker CLI to list the available images on the local docker daemon.
+//
+// Deprecated: Use [ListImagesContextE] instead.
 func ListImagesE(t testing.TestingT, logger *logger.Logger) ([]Image, error) {
+	return ListImagesContextE(t, context.Background(), logger)
+}
+
+// ListImagesContextE is like [ListImagesE] but includes a context.
+func ListImagesContextE(t testing.TestingT, ctx context.Context, logger *logger.Logger) ([]Image, error) {
 	cmd := &shell.Command{
 		Command: "docker",
 		Args:    []string{"images", "--format", "{{ json . }}"},
 		Logger:  logger,
 	}
 
-	out, err := shell.RunCommandContextAndGetOutputE(t, context.Background(), cmd)
+	out, err := shell.RunCommandContextAndGetOutputE(t, ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -112,8 +140,15 @@ func ListImagesE(t testing.TestingT, logger *logger.Logger) ([]Image, error) {
 
 // DoesImageExist lists the images in the docker daemon and returns true if the given image label (repo:tag) exists.
 // This will fail the test if there is an error.
+//
+// Deprecated: Use [DoesImageExistContext] instead.
 func DoesImageExist(t testing.TestingT, imgLabel string, logger *logger.Logger) bool {
-	images := ListImages(t, logger)
+	return DoesImageExistContext(t, context.Background(), imgLabel, logger)
+}
+
+// DoesImageExistContext is like [DoesImageExist] but includes a context.
+func DoesImageExistContext(t testing.TestingT, ctx context.Context, imgLabel string, logger *logger.Logger) bool {
+	images := ListImagesContext(t, ctx, logger)
 
 	imageTags := make([]string, 0, len(images))
 	for i := range images {
