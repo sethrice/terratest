@@ -1,6 +1,7 @@
 package gcp
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -52,6 +53,8 @@ func CreateStorageBucketContextE(t testing.TestingT, ctx context.Context, projec
 		return err
 	}
 
+	defer func() { _ = client.Close() }()
+
 	// Creates a Bucket instance.
 	bucket := client.Bucket(name)
 
@@ -94,6 +97,8 @@ func DeleteStorageBucketContextE(t testing.TestingT, ctx context.Context, name s
 		return err
 	}
 
+	defer func() { _ = client.Close() }()
+
 	return client.Bucket(name).Delete(ctx)
 }
 
@@ -134,6 +139,8 @@ func ReadBucketObjectContextE(t testing.TestingT, ctx context.Context, bucketNam
 		return nil, err
 	}
 
+	defer func() { _ = client.Close() }()
+
 	bucket := client.Bucket(bucketName)
 
 	r, err := bucket.Object(filePath).NewReader(ctx)
@@ -141,7 +148,14 @@ func ReadBucketObjectContextE(t testing.TestingT, ctx context.Context, bucketNam
 		return nil, err
 	}
 
-	return r, nil
+	defer func() { _ = r.Close() }()
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		return nil, err
+	}
+
+	return &buf, nil
 }
 
 // WriteBucketObject writes an object to the given Storage Bucket and returns its URL.
@@ -185,6 +199,8 @@ func WriteBucketObjectContextE(t testing.TestingT, ctx context.Context, bucketNa
 	if err != nil {
 		return "", err
 	}
+
+	defer func() { _ = client.Close() }()
 
 	w := client.Bucket(bucketName).Object(filePath).NewWriter(ctx)
 	w.ContentType = contentType
@@ -241,6 +257,8 @@ func EmptyStorageBucketContextE(t testing.TestingT, ctx context.Context, name st
 	if err != nil {
 		return err
 	}
+
+	defer func() { _ = client.Close() }()
 
 	// List all objects in the bucket
 	//
@@ -305,6 +323,8 @@ func AssertStorageBucketExistsContextE(t testing.TestingT, ctx context.Context, 
 	if err != nil {
 		return err
 	}
+
+	defer func() { _ = client.Close() }()
 
 	// Creates a Bucket instance.
 	bucket := client.Bucket(name)

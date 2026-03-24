@@ -856,7 +856,7 @@ func getRandomInstance(t testing.TestingT, ig InstanceGroup, name string, region
 }
 
 func getRandomInstanceE(t testing.TestingT, ig InstanceGroup, name string, region string, size int64, projectID string) (*Instance, error) {
-	instanceIDs := ig.GetInstanceIds(t)
+	instanceIDs := ig.GetInstanceIDs(t)
 	if len(instanceIDs) == 0 {
 		return nil, fmt.Errorf("could not find any instances in Instance Group %s in Region %s", name, region)
 	}

@@ -6,7 +6,6 @@
 package gcp
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -95,16 +94,14 @@ func purgeAllSSHKeys(t *testing.T, user string) {
 
 	logger.Default.Logf(t, "Purging %d stale SSH keys from OS Login profile for user %s", len(profile.SshPublicKeys), user)
 
-	service, err := NewOSLoginServiceE(t)
+	service, err := NewOSLoginServiceContextE(t, t.Context())
 	if err != nil {
 		t.Logf("Warning: could not create OS Login service to purge keys: %v", err)
 		return
 	}
-
-	ctx := context.Background()
 	for fingerprint := range profile.SshPublicKeys {
 		path := fmt.Sprintf("users/%s/sshPublicKeys/%s", user, fingerprint)
-		if _, err := service.Users.SshPublicKeys.Delete(path).Context(ctx).Do(); err != nil {
+		if _, err := service.Users.SshPublicKeys.Delete(path).Context(t.Context()).Do(); err != nil {
 			t.Logf("Warning: could not delete SSH key %s: %v", fingerprint, err)
 		}
 	}
