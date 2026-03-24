@@ -27,11 +27,11 @@ func TestStaticTokenClient(t *testing.T) {
 	require.Error(t, err)
 	_, err = NewComputeServiceE(t)
 	require.Error(t, err)
-	_, err = newGCRAuther()
+	_, err = newGCRAuthenticator()
 	require.Error(t, err)
 	_, err = NewOSLoginServiceE(t)
 	require.Error(t, err)
-	_, err = newStorageClient()
+	_, err = newStorageClient(ctx)
 	require.Error(t, err)
 
 	// now we instantiate client with oauth2 token
@@ -40,7 +40,7 @@ func TestStaticTokenClient(t *testing.T) {
 	GetAllGcpRegions(t, projectID)
 	GetBuilds(t, projectID)
 	GetLoginProfile(t, GetGoogleIdentityEmailEnvVar(t))
-	_, err = newGCRAuther()
+	_, err = newGCRAuthenticator()
 	require.NoError(t, err)
 	bucket := "gruntwork-terratest-" + strings.ToLower(random.UniqueId())
 	CreateStorageBucket(t, projectID, bucket, nil)

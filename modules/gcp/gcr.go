@@ -13,36 +13,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// DeleteGCRRepo deletes a GCR repository including all tagged images
+// DeleteGCRRepo deletes a GCR repository including all tagged images.
 func DeleteGCRRepo(t testing.TestingT, repo string) {
 	err := DeleteGCRRepoE(t, repo)
 	require.NoError(t, err)
 }
 
-// DeleteGCRRepoE deletes a GCR repository including all tagged images
+// DeleteGCRRepoE deletes a GCR repository including all tagged images.
 func DeleteGCRRepoE(t testing.TestingT, repo string) error {
-	// create a new auther for the API calls
-	auther, err := newGCRAuther()
+	// create a new authenticator for the API calls
+	authenticator, err := newGCRAuthenticator()
 	if err != nil {
-		return fmt.Errorf("Failed to create auther. Got error: %v", err)
+		return fmt.Errorf("failed to create authenticator: %w", err)
 	}
 
 	gcrrepo, err := gcrname.NewRepository(repo)
 	if err != nil {
-		return fmt.Errorf("Failed to get repo. Got error: %v", err)
+		return fmt.Errorf("failed to get repo: %w", err)
 	}
 
 	logger.Default.Logf(t, "Retrieving Image Digests %s", gcrrepo)
-	tags, err := gcrgoogle.List(gcrrepo, gcrgoogle.WithAuth(auther))
+
+	tags, err := gcrgoogle.List(gcrrepo, gcrgoogle.WithAuth(authenticator))
 	if err != nil {
-		return fmt.Errorf("Failed to list tags for repo %s. Got error: %v", repo, err)
+		return fmt.Errorf("failed to list tags for repo %s: %w", repo, err)
 	}
 
 	// attempt to delete the latest image tag
 	latestRef := repo + ":latest"
 	logger.Default.Logf(t, "Deleting Image Ref %s", latestRef)
+
 	if err := DeleteGCRImageRefE(t, latestRef); err != nil {
-		return fmt.Errorf("Failed to delete GCR Image Reference %s. Got error: %v", latestRef, err)
+		return fmt.Errorf("failed to delete GCR image reference %s: %w", latestRef, err)
 	}
 
 	// delete image references sequentially
@@ -51,42 +53,42 @@ func DeleteGCRRepoE(t testing.TestingT, repo string) error {
 		logger.Default.Logf(t, "Deleting Image Ref %s", ref)
 
 		if err := DeleteGCRImageRefE(t, ref); err != nil {
-			return fmt.Errorf("Failed to delete GCR Image Reference %s. Got error: %v", ref, err)
+			return fmt.Errorf("failed to delete GCR image reference %s: %w", ref, err)
 		}
 	}
 
 	return nil
 }
 
-// DeleteGCRImageRef deletes a single repo image ref/digest
+// DeleteGCRImageRef deletes a single repo image ref/digest.
 func DeleteGCRImageRef(t testing.TestingT, ref string) {
 	err := DeleteGCRImageRefE(t, ref)
 	require.NoError(t, err)
 }
 
-// DeleteGCRImageRefE deletes a single repo image ref/digest
+// DeleteGCRImageRefE deletes a single repo image ref/digest.
 func DeleteGCRImageRefE(t testing.TestingT, ref string) error {
 	name, err := gcrname.ParseReference(ref)
 	if err != nil {
-		return fmt.Errorf("Failed to parse reference %s. Got error: %v", ref, err)
+		return fmt.Errorf("failed to parse reference %s: %w", ref, err)
 	}
 
-	// create a new auther for the API calls
-	auther, err := newGCRAuther()
+	// create a new authenticator for the API calls
+	authenticator, err := newGCRAuthenticator()
 	if err != nil {
-		return fmt.Errorf("Failed to create auther. Got error: %v", err)
+		return fmt.Errorf("failed to create authenticator: %w", err)
 	}
 
-	opts := gcrremote.WithAuth(auther)
+	opts := gcrremote.WithAuth(authenticator)
 
 	if err := gcrremote.Delete(name, opts); err != nil {
-		return fmt.Errorf("Failed to delete %s. Got error: %v", name, err)
+		return fmt.Errorf("failed to delete %s: %w", name, err)
 	}
 
 	return nil
 }
 
-func newGCRAuther() (authn.Authenticator, error) {
+func newGCRAuthenticator() (authn.Authenticator, error) {
 	if ts, ok := getStaticTokenSource(); ok {
 		return gcrgoogle.NewTokenSourceAuthenticator(ts), nil
 	}
