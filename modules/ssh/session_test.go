@@ -1,20 +1,24 @@
-package ssh
+package ssh_test
 
 import (
 	"testing"
 
+	"github.com/gruntwork-io/terratest/modules/ssh"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSshConnectionOptions_ConnectionString(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		Address string
 		Port    int
 	}
+
 	tests := []struct {
 		name   string
-		fields fields
 		want   string
+		fields fields
 	}{
 		{
 			name: "plain ipv4",
@@ -41,9 +45,12 @@ func TestSshConnectionOptions_ConnectionString(t *testing.T) {
 			want: "host.for.test.com:443",
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			options := &SshConnectionOptions{
+			t.Parallel()
+
+			options := &ssh.SSHConnectionOptions{
 				Address: tt.fields.Address,
 				Port:    tt.fields.Port,
 			}
