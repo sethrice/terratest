@@ -15,13 +15,18 @@ import (
 
 // ListPods will look for pods in the given namespace that match the given filters and return them. This will fail the
 // test if there is an error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListPods(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) []corev1.Pod {
 	pods, err := ListPodsE(t, options, filters)
 	require.NoError(t, err)
+
 	return pods
 }
 
 // ListPodsE will look for pods in the given namespace that match the given filters and return them.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListPodsE(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) ([]corev1.Pod, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {
@@ -32,6 +37,7 @@ func ListPodsE(t testing.TestingT, options *KubectlOptions, filters metav1.ListO
 	if err != nil {
 		return nil, err
 	}
+
 	return resp.Items, nil
 }
 
@@ -40,6 +46,7 @@ func ListPodsE(t testing.TestingT, options *KubectlOptions, filters metav1.ListO
 func GetPod(t testing.TestingT, options *KubectlOptions, podName string) *corev1.Pod {
 	pod, err := GetPodE(t, options, podName)
 	require.NoError(t, err)
+
 	return pod
 }
 
@@ -49,12 +56,15 @@ func GetPodE(t testing.TestingT, options *KubectlOptions, podName string) (*core
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.CoreV1().Pods(options.Namespace).Get(context.Background(), podName, metav1.GetOptions{})
 }
 
 // WaitUntilNumPodsCreated waits until the desired number of pods are created that match the provided filter. This will
 // retry the check for the specified amount of times, sleeping for the provided duration between each try. This will
 // fail the test if the retry times out.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func WaitUntilNumPodsCreated(
 	t testing.TestingT,
 	options *KubectlOptions,
@@ -68,6 +78,8 @@ func WaitUntilNumPodsCreated(
 
 // WaitUntilNumPodsCreatedE waits until the desired number of pods are created that match the provided filter. This will
 // retry the check for the specified amount of times, sleeping for the provided duration between each try.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func WaitUntilNumPodsCreatedE(
 	t testing.TestingT,
 	options *KubectlOptions,
@@ -77,6 +89,7 @@ func WaitUntilNumPodsCreatedE(
 	sleepBetweenRetries time.Duration,
 ) error {
 	statusMsg := fmt.Sprintf("Wait for num pods created to match desired count %d.", desiredCount)
+
 	message, err := retry.DoWithRetryE(
 		t,
 		statusMsg,
@@ -87,9 +100,11 @@ func WaitUntilNumPodsCreatedE(
 			if err != nil {
 				return "", err
 			}
+
 			if len(pods) != desiredCount {
 				return "", DesiredNumberOfPodsNotCreated{Filter: filters, DesiredCount: desiredCount}
 			}
+
 			return "Desired number of Pods created", nil
 		},
 	)
@@ -97,7 +112,9 @@ func WaitUntilNumPodsCreatedE(
 		options.Logger.Logf(t, "Timedout waiting for the desired number of Pods to be created: %s", err)
 		return err
 	}
+
 	options.Logger.Logf(t, "%s", message)
+
 	return nil
 }
 
@@ -111,6 +128,7 @@ func WaitUntilPodAvailable(t testing.TestingT, options *KubectlOptions, podName 
 // for the provided duration between each try.
 func WaitUntilPodAvailableE(t testing.TestingT, options *KubectlOptions, podName string, retries int, sleepBetweenRetries time.Duration) error {
 	statusMsg := fmt.Sprintf("Wait for pod %s to be provisioned.", podName)
+
 	message, err := retry.DoWithRetryE(
 		t,
 		statusMsg,
@@ -121,9 +139,11 @@ func WaitUntilPodAvailableE(t testing.TestingT, options *KubectlOptions, podName
 			if err != nil {
 				return "", err
 			}
+
 			if !IsPodAvailable(pod) {
 				return "", NewPodNotAvailableError(pod)
 			}
+
 			return "Pod is now available", nil
 		},
 	)
@@ -131,7 +151,9 @@ func WaitUntilPodAvailableE(t testing.TestingT, options *KubectlOptions, podName
 		options.Logger.Logf(t, "Timedout waiting for Pod to be provisioned: %s", err)
 		return err
 	}
+
 	options.Logger.Logf(t, "%s", message)
+
 	return nil
 }
 
@@ -141,14 +163,16 @@ func IsPodAvailable(pod *corev1.Pod) bool {
 	if len(pod.Status.ContainerStatuses) != len(pod.Spec.Containers) {
 		return false
 	}
-	for _, containerStatus := range pod.Status.ContainerStatuses {
-		isContainerStarted := containerStatus.Started
-		isContainerReady := containerStatus.Ready
 
-		if !isContainerReady || (isContainerStarted != nil && *isContainerStarted == false) {
+	for i := range pod.Status.ContainerStatuses {
+		isContainerStarted := pod.Status.ContainerStatuses[i].Started
+		isContainerReady := pod.Status.ContainerStatuses[i].Ready
+
+		if !isContainerReady || (isContainerStarted != nil && !*isContainerStarted) {
 			return false
 		}
 	}
+
 	return pod.Status.Phase == corev1.PodRunning
 }
 
@@ -156,17 +180,21 @@ func IsPodAvailable(pod *corev1.Pod) bool {
 // If the Pod is not running an Error is returned.
 // If the provided containerName is not the name of a container in the Pod an Error is returned.
 func GetPodLogsE(t testing.TestingT, options *KubectlOptions, pod *corev1.Pod, containerName string) (string, error) {
-	var output string
-	var err error
+	var (
+		output string
+		err    error
+	)
+
 	if containerName == "" {
 		output, err = RunKubectlAndGetOutputE(t, options, "logs", pod.Name)
 	} else {
-		output, err = RunKubectlAndGetOutputE(t, options, "logs", pod.Name, fmt.Sprintf("-c%s", containerName))
+		output, err = RunKubectlAndGetOutputE(t, options, "logs", pod.Name, "-c"+containerName)
 	}
 
 	if err != nil {
 		return "", err
 	}
+
 	return output, nil
 }
 
@@ -174,6 +202,7 @@ func GetPodLogsE(t testing.TestingT, options *KubectlOptions, pod *corev1.Pod, c
 func GetPodLogs(t testing.TestingT, options *KubectlOptions, pod *corev1.Pod, containerName string) string {
 	logs, err := GetPodLogsE(t, options, pod, containerName)
 	require.NoError(t, err)
+
 	return logs
 }
 
@@ -182,6 +211,7 @@ func GetPodLogs(t testing.TestingT, options *KubectlOptions, pod *corev1.Pod, co
 func ExecPod(t testing.TestingT, options *KubectlOptions, podName string, containerName string, command ...string) string {
 	o, err := ExecPodE(t, options, podName, containerName, command...)
 	require.NoError(t, err)
+
 	return o
 }
 
@@ -192,7 +222,8 @@ func ExecPodE(t testing.TestingT, options *KubectlOptions, podName string, conta
 	if containerName == "" {
 		args = append([]string{"exec", podName, "--"}, command...)
 	} else {
-		args = append([]string{"exec", podName, fmt.Sprintf("-c%s", containerName), "--"}, command...)
+		args = append([]string{"exec", podName, "-c" + containerName, "--"}, command...)
 	}
+
 	return RunKubectlAndGetOutputE(t, options, args...)
 }

@@ -1,4 +1,4 @@
-package k8s
+package k8s //nolint:dupl // structural pattern for k8s resource operations
 
 import (
 	"context"
@@ -17,13 +17,18 @@ import (
 
 // ListPersistentVolumeClaims will look for PersistentVolumeClaims in the given namespace that match the given filters and return them. This will fail the
 // test if there is an error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListPersistentVolumeClaims(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) []corev1.PersistentVolumeClaim {
 	pvcs, err := ListPersistentVolumeClaimsE(t, options, filters)
 	require.NoError(t, err)
+
 	return pvcs
 }
 
 // ListPersistentVolumeClaimsE will look for PersistentVolumeClaims in the given namespace that match the given filters and return them.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListPersistentVolumeClaimsE(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) ([]corev1.PersistentVolumeClaim, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {
@@ -34,6 +39,7 @@ func ListPersistentVolumeClaimsE(t testing.TestingT, options *KubectlOptions, fi
 	if err != nil {
 		return nil, err
 	}
+
 	return resp.Items, nil
 }
 
@@ -42,6 +48,7 @@ func ListPersistentVolumeClaimsE(t testing.TestingT, options *KubectlOptions, fi
 func GetPersistentVolumeClaim(t testing.TestingT, options *KubectlOptions, pvcName string) *corev1.PersistentVolumeClaim {
 	pvc, err := GetPersistentVolumeClaimE(t, options, pvcName)
 	require.NoError(t, err)
+
 	return pvc
 }
 
@@ -51,6 +58,7 @@ func GetPersistentVolumeClaimE(t testing.TestingT, options *KubectlOptions, pvcN
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.CoreV1().PersistentVolumeClaims(options.Namespace).Get(context.Background(), pvcName, metav1.GetOptions{})
 }
 
@@ -66,8 +74,11 @@ func WaitUntilPersistentVolumeClaimInStatus(t testing.TestingT, options *Kubectl
 // retrying the check for the specified amount of times, sleeping
 // for the provided duration between each try.
 // This will fail the test if there is an error.
+//
+//nolint:dupl // structural pattern for k8s resource operations
 func WaitUntilPersistentVolumeClaimInStatusE(t testing.TestingT, options *KubectlOptions, pvcName string, pvcStatusPhase *corev1.PersistentVolumeClaimPhase, retries int, sleepBetweenRetries time.Duration) error {
 	statusMsg := fmt.Sprintf("Wait for PersistentVolumeClaim %s to be '%s'.", pvcName, *pvcStatusPhase)
+
 	message, err := retry.DoWithRetryE(
 		t,
 		statusMsg,
@@ -78,9 +89,11 @@ func WaitUntilPersistentVolumeClaimInStatusE(t testing.TestingT, options *Kubect
 			if err != nil {
 				return "", err
 			}
+
 			if !IsPersistentVolumeClaimInStatus(pvc, pvcStatusPhase) {
 				return "", NewPersistentVolumeClaimNotInStatusError(pvc, pvcStatusPhase)
 			}
+
 			return fmt.Sprintf("PersistentVolumeClaim is now '%s'", *pvcStatusPhase), nil
 		},
 	)
@@ -88,7 +101,9 @@ func WaitUntilPersistentVolumeClaimInStatusE(t testing.TestingT, options *Kubect
 		logger.Default.Logf(t, "Timeout waiting for PersistentVolumeClaim to be '%s': %s", *pvcStatusPhase, err)
 		return err
 	}
+
 	logger.Default.Logf(t, "%s", message)
+
 	return nil
 }
 

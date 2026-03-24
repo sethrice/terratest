@@ -13,6 +13,7 @@ import (
 func GetClusterRole(t testing.TestingT, options *KubectlOptions, roleName string) *rbacv1.ClusterRole {
 	role, err := GetClusterRoleE(t, options, roleName)
 	require.NoError(t, err)
+
 	return role
 }
 
@@ -22,5 +23,6 @@ func GetClusterRoleE(t testing.TestingT, options *KubectlOptions, roleName strin
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.RbacV1().ClusterRoles().Get(context.Background(), roleName, metav1.GetOptions{})
 }

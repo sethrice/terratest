@@ -1,4 +1,4 @@
-package k8s
+package k8s //nolint:dupl // structural pattern for k8s resource operations
 
 import (
 	"context"
@@ -12,22 +12,29 @@ import (
 
 // ListDaemonSets will look for daemonsets in the given namespace that match the given filters and return them. This will
 // fail the test if there is an error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListDaemonSets(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) []appsv1.DaemonSet {
 	daemonset, err := ListDaemonSetsE(t, options, filters)
 	require.NoError(t, err)
+
 	return daemonset
 }
 
 // ListDaemonSetsE will look for daemonsets in the given namespace that match the given filters and return them.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListDaemonSetsE(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) ([]appsv1.DaemonSet, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {
 		return nil, err
 	}
+
 	resp, err := clientset.AppsV1().DaemonSets(options.Namespace).List(context.Background(), filters)
 	if err != nil {
 		return nil, err
 	}
+
 	return resp.Items, nil
 }
 
@@ -36,6 +43,7 @@ func ListDaemonSetsE(t testing.TestingT, options *KubectlOptions, filters metav1
 func GetDaemonSet(t testing.TestingT, options *KubectlOptions, daemonSetName string) *appsv1.DaemonSet {
 	daemonset, err := GetDaemonSetE(t, options, daemonSetName)
 	require.NoError(t, err)
+
 	return daemonset
 }
 
@@ -45,5 +53,6 @@ func GetDaemonSetE(t testing.TestingT, options *KubectlOptions, daemonSetName st
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.AppsV1().DaemonSets(options.Namespace).Get(context.Background(), daemonSetName, metav1.GetOptions{})
 }

@@ -1,4 +1,4 @@
-package k8s
+package k8s //nolint:dupl // structural pattern for k8s resource operations
 
 import (
 	"context"
@@ -12,22 +12,29 @@ import (
 
 // ListReplicaSets will look for replicasets in the given namespace that match the given filters and return them. This will
 // fail the test if there is an error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListReplicaSets(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) []appsv1.ReplicaSet {
 	replicaset, err := ListReplicaSetsE(t, options, filters)
 	require.NoError(t, err)
+
 	return replicaset
 }
 
 // ListReplicaSetsE will look for replicasets in the given namespace that match the given filters and return them.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListReplicaSetsE(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) ([]appsv1.ReplicaSet, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {
 		return nil, err
 	}
+
 	replicasets, err := clientset.AppsV1().ReplicaSets(options.Namespace).List(context.Background(), filters)
 	if err != nil {
 		return nil, err
 	}
+
 	return replicasets.Items, nil
 }
 
@@ -36,6 +43,7 @@ func ListReplicaSetsE(t testing.TestingT, options *KubectlOptions, filters metav
 func GetReplicaSet(t testing.TestingT, options *KubectlOptions, replicaSetName string) *appsv1.ReplicaSet {
 	replicaset, err := GetReplicaSetE(t, options, replicaSetName)
 	require.NoError(t, err)
+
 	return replicaset
 }
 
@@ -45,5 +53,6 @@ func GetReplicaSetE(t testing.TestingT, options *KubectlOptions, replicaSetName 
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.AppsV1().ReplicaSets(options.Namespace).Get(context.Background(), replicaSetName, metav1.GetOptions{})
 }
