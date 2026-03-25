@@ -19,37 +19,45 @@ func GetKubernetesClientE(t testing.TestingT) (*kubernetes.Clientset, error) {
 	}
 
 	options := NewKubectlOptions("", kubeConfigPath, "default")
+
 	return GetKubernetesClientFromOptionsE(t, options)
 }
 
 // GetKubernetesClientFromOptionsE returns a Kubernetes API client given a configured KubectlOptions object.
 func GetKubernetesClientFromOptionsE(t testing.TestingT, options *KubectlOptions) (*kubernetes.Clientset, error) {
-	var err error
-	var config *rest.Config
+	var (
+		err    error
+		config *rest.Config
+	)
 
-	if options.InClusterAuth {
+	switch {
+	case options.InClusterAuth:
 		config, err = rest.InClusterConfig()
 		if err != nil {
 			return nil, err
 		}
+
 		options.Logger.Logf(t, "Configuring Kubernetes client to use the in-cluster serviceaccount token")
-	} else if options.RestConfig != nil {
+	case options.RestConfig != nil:
 		config = options.RestConfig
 		options.Logger.Logf(t, "Configuring Kubernetes client to use provided rest config object set with API server address: %s", config.Host)
-	} else {
+	default:
 		kubeConfigPath, err := options.GetConfigPath(t)
 		if err != nil {
 			return nil, err
 		}
+
 		options.Logger.Logf(t, "Configuring Kubernetes client using config file %s with context %s", kubeConfigPath, options.ContextName)
 		// Load API config (instead of more low level ClientConfig)
-		config, err = LoadApiClientConfigE(kubeConfigPath, options.ContextName)
+		config, err = LoadAPIClientConfigE(kubeConfigPath, options.ContextName)
 		if err != nil {
 			options.Logger.Logf(t, "Error loading api client config, falling back to in-cluster authentication via serviceaccount token: %s", err)
+
 			config, err = rest.InClusterConfig()
 			if err != nil {
 				return nil, err
 			}
+
 			options.Logger.Logf(t, "Configuring Kubernetes client to use the in-cluster serviceaccount token")
 		}
 	}

@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -24,20 +23,31 @@ func LoadConfigFromPath(path string) clientcmd.ClientConfig {
 	config := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: path},
 		&clientcmd.ConfigOverrides{})
+
 	return config
 }
 
-// LoadApiClientConfigE will load a ClientConfig object from a file path that points to a location on disk containing a
+// LoadAPIClientConfigE loads a ClientConfig object from a file path that points to a location on disk containing a
 // kubectl config, with the requested context loaded.
-func LoadApiClientConfigE(configPath string, contextName string) (*restclient.Config, error) {
+func LoadAPIClientConfigE(configPath string, contextName string) (*restclient.Config, error) {
 	overrides := clientcmd.ConfigOverrides{}
 	if contextName != "" {
 		overrides.CurrentContext = contextName
 	}
+
 	config := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: configPath},
 		&overrides)
+
 	return config.ClientConfig()
+}
+
+// LoadApiClientConfigE loads a ClientConfig object from a file path that points to a location on disk containing a
+// kubectl config, with the requested context loaded.
+//
+// Deprecated: Use LoadAPIClientConfigE instead.
+func LoadApiClientConfigE(configPath string, contextName string) (*restclient.Config, error) { //nolint:staticcheck,revive // deprecated
+	return LoadAPIClientConfigE(configPath, contextName)
 }
 
 // DeleteConfigContextE will remove the context specified at the provided name, and remove any clusters and authinfos
@@ -59,6 +69,7 @@ func DeleteConfigContextWithPathE(t testing.TestingT, kubeConfigPath string, con
 
 	// Load config and get data structure representing config info
 	config := LoadConfigFromPath(kubeConfigPath)
+
 	rawConfig, err := config.RawConfig()
 	if err != nil {
 		return err
@@ -70,6 +81,7 @@ func DeleteConfigContextWithPathE(t testing.TestingT, kubeConfigPath string, con
 		logger.Default.Logf(t, "WARNING: Could not find context %s from config at path %s", contextName, kubeConfigPath)
 		return nil
 	}
+
 	delete(rawConfig.Contexts, contextName)
 
 	// If the removing context is the current context, be sure to set a new one
@@ -81,6 +93,7 @@ func DeleteConfigContextWithPathE(t testing.TestingT, kubeConfigPath string, con
 
 	// Finally, clean up orphaned clusters and authinfos and then save config
 	RemoveOrphanedClusterAndAuthInfoConfig(&rawConfig)
+
 	if err := clientcmd.ModifyConfig(config.ConfigAccess(), rawConfig, false); err != nil {
 		return err
 	}
@@ -90,6 +103,7 @@ func DeleteConfigContextWithPathE(t testing.TestingT, kubeConfigPath string, con
 		"Removed context %s from config at path %s and any orphaned clusters and authinfos",
 		contextName,
 		kubeConfigPath)
+
 	return nil
 }
 
@@ -97,16 +111,19 @@ func DeleteConfigContextWithPathE(t testing.TestingT, kubeConfigPath string, con
 // the new current context
 func setNewContext(config *api.Config) error {
 	// Sort contextNames and pick the first one
-	var contextNames []string
+	contextNames := make([]string, 0, len(config.Contexts))
 	for name := range config.Contexts {
 		contextNames = append(contextNames, name)
 	}
+
 	sort.Strings(contextNames)
+
 	if len(contextNames) > 0 {
 		config.CurrentContext = contextNames[0]
 	} else {
-		return errors.New("There are no available contexts remaining")
+		return ErrNoAvailableContexts
 	}
+
 	return nil
 }
 
@@ -114,11 +131,13 @@ func setNewContext(config *api.Config) error {
 // contexts associated with it
 func RemoveOrphanedClusterAndAuthInfoConfig(config *api.Config) {
 	newAuthInfos := map[string]*api.AuthInfo{}
+
 	newClusters := map[string]*api.Cluster{}
 	for _, context := range config.Contexts {
 		newClusters[context.Cluster] = config.Clusters[context.Cluster]
 		newAuthInfos[context.AuthInfo] = config.AuthInfos[context.AuthInfo]
 	}
+
 	config.AuthInfos = newAuthInfos
 	config.Clusters = newClusters
 }
@@ -131,8 +150,10 @@ func GetKubeConfigPathE(t testing.TestingT) (string, error) {
 		if err != nil {
 			return "", err
 		}
+
 		kubeConfigPath = configPath
 	}
+
 	return kubeConfigPath, nil
 }
 
@@ -143,7 +164,9 @@ func KubeConfigPathFromHomeDirE() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	configPath := filepath.Join(home, ".kube", "config")
+
 	return configPath, err
 }
 
@@ -153,10 +176,12 @@ func CopyHomeKubeConfigToTemp(t testing.TestingT) string {
 	path, err := CopyHomeKubeConfigToTempE(t)
 	if err != nil {
 		if path != "" {
-			os.Remove(path)
+			_ = os.Remove(path)
 		}
+
 		t.Fatal(err)
 	}
+
 	return path
 }
 
@@ -166,12 +191,15 @@ func CopyHomeKubeConfigToTempE(t testing.TestingT) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	tmpConfig, err := os.CreateTemp("", "")
 	if err != nil {
 		return "", gwErrors.WithStackTrace(err)
 	}
 	defer tmpConfig.Close()
+
 	err = files.CopyFile(configPath, tmpConfig.Name())
+
 	return tmpConfig.Name(), err
 }
 

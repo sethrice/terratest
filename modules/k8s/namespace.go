@@ -21,11 +21,14 @@ func CreateNamespaceE(t testing.TestingT, options *KubectlOptions, namespaceName
 	namespaceObject := metav1.ObjectMeta{
 		Name: namespaceName,
 	}
+
 	return CreateNamespaceWithMetadataE(t, options, namespaceObject)
 }
 
 // CreateNamespaceWithMetadataE will create a new Kubernetes namespace on the cluster targeted by the provided options and
 // with the provided metadata. This method expects the entire namespace ObjectMeta to be passed in, so you'll need to set the name within the ObjectMeta struct yourself.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func CreateNamespaceWithMetadataE(t testing.TestingT, options *KubectlOptions, namespaceObjectMeta metav1.ObjectMeta) error {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {
@@ -36,12 +39,15 @@ func CreateNamespaceWithMetadataE(t testing.TestingT, options *KubectlOptions, n
 		ObjectMeta: namespaceObjectMeta,
 	}
 	_, err = clientset.CoreV1().Namespaces().Create(context.Background(), &namespace, metav1.CreateOptions{})
+
 	return err
 }
 
 // CreateNamespaceWithMetadata will create a new Kubernetes namespace on the cluster targeted by the provided options and
 // with the provided metadata. This method expects the entire namespace ObjectMeta to be passed in, so you'll need to set the name within the ObjectMeta struct yourself.
 // This will fail the test if there is an error while creating the namespace.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func CreateNamespaceWithMetadata(t testing.TestingT, options *KubectlOptions, namespaceObjectMeta metav1.ObjectMeta) {
 	require.NoError(t, CreateNamespaceWithMetadataE(t, options, namespaceObjectMeta))
 }
@@ -52,6 +58,7 @@ func GetNamespace(t testing.TestingT, options *KubectlOptions, namespaceName str
 	namespace, err := GetNamespaceE(t, options, namespaceName)
 	require.NoError(t, err)
 	require.NotNil(t, namespace)
+
 	return namespace
 }
 
@@ -83,15 +90,18 @@ func DeleteNamespaceE(t testing.TestingT, options *KubectlOptions, namespaceName
 
 // ListNamespaces will list all namespaces in the Kubernetes cluster targeted by the provided options.
 // This will fail the test if there is an error in listing the namespaces.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListNamespaces(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) []corev1.Namespace {
 	namespaces, err := ListNamespacesE(t, options, filters)
 	require.NoError(t, err)
 
 	if len(namespaces) > 0 {
-		var namespaceNames []string
+		namespaceNames := make([]string, 0, len(namespaces))
 		for _, ns := range namespaces {
 			namespaceNames = append(namespaceNames, ns.Name)
 		}
+
 		options.Logger.Logf(t, "Found namespaces: %s", strings.Join(namespaceNames, ", "))
 	} else {
 		options.Logger.Logf(t, "No namespaces found matching the provided filters.")
@@ -101,6 +111,8 @@ func ListNamespaces(t testing.TestingT, options *KubectlOptions, filters metav1.
 }
 
 // ListNamespacesE lists all namespaces in the Kubernetes cluster and returns them or an error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListNamespacesE(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) ([]corev1.Namespace, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {

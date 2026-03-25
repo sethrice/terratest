@@ -13,13 +13,18 @@ import (
 
 // ListEvents will retrieve the Events in the given namespace that match the given filters and return them. This will fail the
 // test if there is an error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListEvents(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) []corev1.Event {
 	events, err := ListEventsE(t, options, filters)
 	require.NoError(t, err)
+
 	return events
 }
 
 // ListEventsE will retrieve the Events that match the given filters and return them.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListEventsE(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) ([]corev1.Event, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {
@@ -30,5 +35,6 @@ func ListEventsE(t testing.TestingT, options *KubectlOptions, filters metav1.Lis
 	if err != nil {
 		return nil, err
 	}
+
 	return resp.Items, nil
 }

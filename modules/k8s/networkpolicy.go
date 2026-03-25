@@ -1,4 +1,4 @@
-package k8s
+package k8s //nolint:dupl // structural pattern for k8s resource operations
 
 import (
 	"context"
@@ -17,6 +17,7 @@ import (
 func GetNetworkPolicy(t testing.TestingT, options *KubectlOptions, networkPolicyName string) *networkingv1.NetworkPolicy {
 	networkPolicy, err := GetNetworkPolicyE(t, options, networkPolicyName)
 	require.NoError(t, err)
+
 	return networkPolicy
 }
 
@@ -27,6 +28,7 @@ func GetNetworkPolicyE(t testing.TestingT, options *KubectlOptions, networkPolic
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.NetworkingV1().NetworkPolicies(options.Namespace).Get(context.Background(), networkPolicyName, metav1.GetOptions{})
 }
 

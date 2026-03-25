@@ -16,22 +16,29 @@ import (
 
 // ListDeployments will look for deployments in the given namespace that match the given filters and return them. This will
 // fail the test if there is an error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListDeployments(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) []appsv1.Deployment {
 	deployment, err := ListDeploymentsE(t, options, filters)
 	require.NoError(t, err)
+
 	return deployment
 }
 
 // ListDeploymentsE will look for deployments in the given namespace that match the given filters and return them.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListDeploymentsE(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) ([]appsv1.Deployment, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {
 		return nil, err
 	}
+
 	deployments, err := clientset.AppsV1().Deployments(options.Namespace).List(context.Background(), filters)
 	if err != nil {
 		return nil, err
 	}
+
 	return deployments.Items, nil
 }
 
@@ -40,6 +47,7 @@ func ListDeploymentsE(t testing.TestingT, options *KubectlOptions, filters metav
 func GetDeployment(t testing.TestingT, options *KubectlOptions, deploymentName string) *appsv1.Deployment {
 	deployment, err := GetDeploymentE(t, options, deploymentName)
 	require.NoError(t, err)
+
 	return deployment
 }
 
@@ -49,10 +57,11 @@ func GetDeploymentE(t testing.TestingT, options *KubectlOptions, deploymentName 
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.AppsV1().Deployments(options.Namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
 }
 
-// WaitUntilDeploymentAvailableE waits until all pods within the deployment are ready and started,
+// WaitUntilDeploymentAvailable waits until all pods within the deployment are ready and started,
 // retrying the check for the specified amount of times, sleeping
 // for the provided duration between each try.
 // This will fail the test if there is an error.
@@ -71,6 +80,7 @@ func WaitUntilDeploymentAvailableE(
 	sleepBetweenRetries time.Duration,
 ) error {
 	statusMsg := fmt.Sprintf("Wait for deployment %s to be provisioned.", deploymentName)
+
 	message, err := retry.DoWithRetryE(
 		t,
 		statusMsg,
@@ -81,9 +91,11 @@ func WaitUntilDeploymentAvailableE(
 			if err != nil {
 				return "", err
 			}
+
 			if !IsDeploymentAvailable(deployment) {
 				return "", NewDeploymentNotAvailableError(deployment)
 			}
+
 			return "Deployment is now available", nil
 		},
 	)
@@ -91,7 +103,9 @@ func WaitUntilDeploymentAvailableE(
 		options.Logger.Logf(t, "Timedout waiting for Deployment to be provisioned: %s", err)
 		return err
 	}
+
 	options.Logger.Logf(t, "%s", message)
+
 	return nil
 }
 
@@ -108,5 +122,6 @@ func getDeploymentCondition(deploy *appsv1.Deployment, cType appsv1.DeploymentCo
 			return dc
 		}
 	}
+
 	return nil
 }

@@ -2,7 +2,7 @@ package k8s
 
 import "github.com/gruntwork-io/terratest/modules/testing"
 
-// GetKubernetesClusterVersion returns the Kubernetes cluster version.
+// GetKubernetesClusterVersionE returns the Kubernetes cluster version.
 func GetKubernetesClusterVersionE(t testing.TestingT) (string, error) {
 	kubeConfigPath, err := GetKubeConfigPathE(t)
 	if err != nil {
@@ -14,7 +14,7 @@ func GetKubernetesClusterVersionE(t testing.TestingT) (string, error) {
 	return GetKubernetesClusterVersionWithOptionsE(t, options)
 }
 
-// GetKubernetesClusterVersion returns the Kubernetes cluster version given a configured KubectlOptions object.
+// GetKubernetesClusterVersionWithOptionsE returns the Kubernetes cluster version given a configured KubectlOptions object.
 func GetKubernetesClusterVersionWithOptionsE(t testing.TestingT, kubectlOptions *KubectlOptions) (string, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, kubectlOptions)
 	if err != nil {

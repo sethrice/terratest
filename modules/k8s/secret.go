@@ -1,4 +1,4 @@
-package k8s
+package k8s //nolint:dupl // structural pattern for k8s resource operations
 
 import (
 	"context"
@@ -17,6 +17,7 @@ import (
 func GetSecret(t testing.TestingT, options *KubectlOptions, secretName string) *corev1.Secret {
 	secret, err := GetSecretE(t, options, secretName)
 	require.NoError(t, err)
+
 	return secret
 }
 
@@ -27,6 +28,7 @@ func GetSecretE(t testing.TestingT, options *KubectlOptions, secretName string) 
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.CoreV1().Secrets(options.Namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 }
 

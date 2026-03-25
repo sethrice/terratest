@@ -1,4 +1,4 @@
-package k8s
+package k8s_test
 
 import (
 	"encoding/json"
@@ -6,38 +6,40 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/gruntwork-io/terratest/modules/k8s"
 )
 
 func TestUnmarshalJSONPath(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
+		expectedOut any
 		name        string
 		jsonBlob    string
 		jsonPath    string
-		expectedOut interface{}
 	}{
 		{
-			"boolField",
-			`{"key": true}`,
-			"{ .key }",
-			[]bool{true},
+			name:        "boolField",
+			jsonBlob:    `{"key": true}`,
+			jsonPath:    "{ .key }",
+			expectedOut: []bool{true},
 		},
 		{
-			"nestedObject",
-			`{"key": {"data": [1,2,3]}}`,
-			"{ .key }",
-			[]map[string][]int{
-				map[string][]int{
-					"data": []int{1, 2, 3},
+			name:     "nestedObject",
+			jsonBlob: `{"key": {"data": [1,2,3]}}`,
+			jsonPath: "{ .key }",
+			expectedOut: []map[string][]int{
+				{
+					"data": {1, 2, 3},
 				},
 			},
 		},
 		{
-			"nestedArray",
-			`{"key": {"data": [1,2,3]}}`,
-			"{ .key.data[*] }",
-			[]int{1, 2, 3},
+			name:        "nestedArray",
+			jsonBlob:    `{"key": {"data": [1,2,3]}}`,
+			jsonPath:    "{ .key.data[*] }",
+			expectedOut: []int{1, 2, 3},
 		},
 	}
 
@@ -46,15 +48,16 @@ func TestUnmarshalJSONPath(t *testing.T) {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
-			var output interface{}
-			UnmarshalJSONPath(t, []byte(testCase.jsonBlob), testCase.jsonPath, &output)
+
+			var output any
+			k8s.UnmarshalJSONPath(t, []byte(testCase.jsonBlob), testCase.jsonPath, &output)
 			// NOTE: we have to do equality check on the marshalled json data to allow equality checks over dynamic
 			// types in this table driven test.
 			expectedOutJSON, err := json.Marshal(testCase.expectedOut)
 			require.NoError(t, err)
 			actualOutJSON, err := json.Marshal(output)
 			require.NoError(t, err)
-			assert.Equal(t, string(expectedOutJSON), string(actualOutJSON))
+			assert.JSONEq(t, string(expectedOutJSON), string(actualOutJSON))
 		})
 	}
 }

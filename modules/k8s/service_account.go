@@ -2,7 +2,7 @@ package k8s
 
 import (
 	"context"
-	"fmt"
+	stderrors "errors"
 	"time"
 
 	"github.com/gruntwork-io/go-commons/errors"
@@ -17,11 +17,21 @@ import (
 	"github.com/gruntwork-io/terratest/modules/testing"
 )
 
+const (
+	// tokenExpirationSeconds is the expiration time for service account tokens requested via the TokenRequest API.
+	tokenExpirationSeconds int64 = 3600
+	// tokenSecretRetryCount is the number of retries when waiting for a service account secret to be provisioned.
+	tokenSecretRetryCount = 30
+	// tokenSecretSleepSeconds is the number of seconds to sleep between retries when waiting for a service account secret.
+	tokenSecretSleepSeconds = 10
+)
+
 // GetServiceAccount returns a Kubernetes service account resource in the provided namespace with the given name. The
 // namespace used is the one provided in the KubectlOptions. This will fail the test if there is an error.
 func GetServiceAccount(t testing.TestingT, options *KubectlOptions, serviceAccountName string) *corev1.ServiceAccount {
 	serviceAccount, err := GetServiceAccountE(t, options, serviceAccountName)
 	require.NoError(t, err)
+
 	return serviceAccount
 }
 
@@ -32,6 +42,7 @@ func GetServiceAccountE(t testing.TestingT, options *KubectlOptions, serviceAcco
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.CoreV1().ServiceAccounts(options.Namespace).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
 }
 
@@ -56,6 +67,7 @@ func CreateServiceAccountE(t testing.TestingT, options *KubectlOptions, serviceA
 		},
 	}
 	_, err = clientset.CoreV1().ServiceAccounts(options.Namespace).Create(context.Background(), &serviceAccount, metav1.CreateOptions{})
+
 	return err
 }
 
@@ -64,6 +76,7 @@ func CreateServiceAccountE(t testing.TestingT, options *KubectlOptions, serviceA
 func GetServiceAccountAuthToken(t testing.TestingT, kubectlOptions *KubectlOptions, serviceAccountName string) string {
 	token, err := GetServiceAccountAuthTokenE(t, kubectlOptions, serviceAccountName)
 	require.NoError(t, err)
+
 	return token
 }
 
@@ -77,12 +90,13 @@ func GetServiceAccountAuthTokenE(t testing.TestingT, kubectlOptions *KubectlOpti
 	}
 
 	// First try the TokenRequest API (K8s 1.24+)
+	expSeconds := tokenExpirationSeconds
 	tokenRequest := &authenticationv1.TokenRequest{
 		Spec: authenticationv1.TokenRequestSpec{
-			// Use a long expiration for test purposes
-			ExpirationSeconds: new(int64(3600)),
+			ExpirationSeconds: &expSeconds,
 		},
 	}
+
 	tokenResponse, err := clientset.CoreV1().ServiceAccounts(kubectlOptions.Namespace).CreateToken(
 		context.Background(),
 		serviceAccountName,
@@ -95,35 +109,43 @@ func GetServiceAccountAuthTokenE(t testing.TestingT, kubectlOptions *KubectlOpti
 
 	// Fall back to legacy secret-based tokens for older K8s versions
 	kubectlOptions.Logger.Logf(t, "TokenRequest API failed (%s), falling back to secret-based tokens", err)
+
 	msg, retryErr := retry.DoWithRetryE(
 		t,
 		"Waiting for ServiceAccount Token to be provisioned",
-		30,
-		10*time.Second,
+		tokenSecretRetryCount,
+		tokenSecretSleepSeconds*time.Second,
 		func() (string, error) {
 			kubectlOptions.Logger.Logf(t, "Checking if service account has secret")
+
 			serviceAccount := GetServiceAccount(t, kubectlOptions, serviceAccountName)
 			if len(serviceAccount.Secrets) == 0 {
-				msg := "No secrets on the service account yet"
+				msg := "no secrets on the service account yet"
 				kubectlOptions.Logger.Logf(t, "%s", msg)
-				return "", fmt.Errorf("%s", msg)
+
+				return "", stderrors.New(msg)
 			}
+
 			return "Service Account has secret", nil
 		},
 	)
 	if retryErr != nil {
 		return "", retryErr
 	}
+
 	kubectlOptions.Logger.Logf(t, "%s", msg)
 
 	serviceAccount, err := GetServiceAccountE(t, kubectlOptions, serviceAccountName)
 	if err != nil {
 		return "", err
 	}
+
 	if len(serviceAccount.Secrets) != 1 {
 		return "", errors.WithStackTrace(ServiceAccountTokenNotAvailable{serviceAccountName})
 	}
+
 	secret := GetSecret(t, kubectlOptions, serviceAccount.Secrets[0].Name)
+
 	return string(secret.Data["token"]), nil
 }
 
@@ -138,6 +160,7 @@ func AddConfigContextForServiceAccountE(
 ) error {
 	// First load the config context
 	config := LoadConfigFromPath(kubectlOptions.ConfigPath)
+
 	rawConfig, err := config.RawConfig()
 	if err != nil {
 		return errors.WithStackTrace(err)
@@ -157,5 +180,6 @@ func AddConfigContextForServiceAccountE(
 	if err := clientcmd.ModifyConfig(config.ConfigAccess(), rawConfig, false); err != nil {
 		return errors.WithStackTrace(err)
 	}
+
 	return nil
 }

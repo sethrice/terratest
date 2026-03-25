@@ -1,4 +1,4 @@
-package k8s
+package k8s //nolint:dupl // structural pattern for k8s resource operations
 
 import (
 	"context"
@@ -18,6 +18,7 @@ import (
 func GetConfigMap(t testing.TestingT, options *KubectlOptions, configMapName string) *corev1.ConfigMap {
 	configMap, err := GetConfigMapE(t, options, configMapName)
 	require.NoError(t, err)
+
 	return configMap
 }
 
@@ -28,6 +29,7 @@ func GetConfigMapE(t testing.TestingT, options *KubectlOptions, configMapName st
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.CoreV1().ConfigMaps(options.Namespace).Get(context.Background(), configMapName, metav1.GetOptions{})
 }
 

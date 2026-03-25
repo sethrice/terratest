@@ -1,16 +1,19 @@
-package k8s
+package k8s_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/gruntwork-io/terratest/modules/k8s"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestErrorDeploymentNotAvailable(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		title       string
 		deploy      *appsv1.Deployment
@@ -53,7 +56,8 @@ func TestErrorDeploymentNotAvailable(t *testing.T) {
 		tc := tc
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
-			err := NewDeploymentNotAvailableError(tc.deploy)
+
+			err := k8s.NewDeploymentNotAvailableError(tc.deploy)
 			assert.EqualError(t, err, tc.expectedErr)
 		})
 	}

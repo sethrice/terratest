@@ -16,13 +16,18 @@ import (
 
 // ListJobs will look for Jobs in the given namespace that match the given filters and return them. This will fail the
 // test if there is an error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListJobs(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) []batchv1.Job {
 	jobs, err := ListJobsE(t, options, filters)
 	require.NoError(t, err)
+
 	return jobs
 }
 
 // ListJobsE will look for jobs in the given namespace that match the given filters and return them.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListJobsE(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) ([]batchv1.Job, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {
@@ -33,6 +38,7 @@ func ListJobsE(t testing.TestingT, options *KubectlOptions, filters metav1.ListO
 	if err != nil {
 		return nil, err
 	}
+
 	return resp.Items, nil
 }
 
@@ -41,6 +47,7 @@ func ListJobsE(t testing.TestingT, options *KubectlOptions, filters metav1.ListO
 func GetJob(t testing.TestingT, options *KubectlOptions, jobName string) *batchv1.Job {
 	job, err := GetJobE(t, options, jobName)
 	require.NoError(t, err)
+
 	return job
 }
 
@@ -50,10 +57,11 @@ func GetJobE(t testing.TestingT, options *KubectlOptions, jobName string) (*batc
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.BatchV1().Jobs(options.Namespace).Get(context.Background(), jobName, metav1.GetOptions{})
 }
 
-// WaitUntilJobSucceed waits until requested job is suceeded, retrying the check for the specified amount of times, sleeping
+// WaitUntilJobSucceed waits until requested job is succeeded, retrying the check for the specified amount of times, sleeping
 // for the provided duration between each try. This will fail the test if there is an error or if the check times out.
 func WaitUntilJobSucceed(t testing.TestingT, options *KubectlOptions, jobName string, retries int, sleepBetweenRetries time.Duration) {
 	require.NoError(t, WaitUntilJobSucceedE(t, options, jobName, retries, sleepBetweenRetries))
@@ -63,6 +71,7 @@ func WaitUntilJobSucceed(t testing.TestingT, options *KubectlOptions, jobName st
 // for the provided duration between each try.
 func WaitUntilJobSucceedE(t testing.TestingT, options *KubectlOptions, jobName string, retries int, sleepBetweenRetries time.Duration) error {
 	statusMsg := fmt.Sprintf("Wait for job %s to be provisioned.", jobName)
+
 	message, err := retry.DoWithRetryE(
 		t,
 		statusMsg,
@@ -73,9 +82,11 @@ func WaitUntilJobSucceedE(t testing.TestingT, options *KubectlOptions, jobName s
 			if err != nil {
 				return "", err
 			}
+
 			if !IsJobSucceeded(job) {
 				return "", NewJobNotSucceeded(job)
 			}
+
 			return "Job is now Succeeded", nil
 		},
 	)
@@ -83,7 +94,9 @@ func WaitUntilJobSucceedE(t testing.TestingT, options *KubectlOptions, jobName s
 		options.Logger.Logf(t, "Timed out waiting for Job to be provisioned: %s", err)
 		return err
 	}
+
 	options.Logger.Logf(t, "%s", message)
+
 	return nil
 }
 
@@ -95,6 +108,7 @@ func IsJobSucceeded(job *batchv1.Job) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -102,6 +116,7 @@ func IsJobSucceeded(job *batchv1.Job) bool {
 func CreateJobFromCronJob(t testing.TestingT, options *KubectlOptions, cronJobName, newJobName string) *batchv1.Job {
 	job, err := CreateJobFromCronJobE(t, options, cronJobName, newJobName)
 	require.NoError(t, err)
+
 	return job
 }
 
@@ -135,5 +150,6 @@ func CreateJobFromCronJobE(t testing.TestingT, options *KubectlOptions, cronJobN
 	}
 
 	createdJob, err := clientset.BatchV1().Jobs(options.Namespace).Create(context.Background(), job, metav1.CreateOptions{})
+
 	return createdJob, err
 }

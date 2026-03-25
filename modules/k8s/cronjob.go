@@ -14,22 +14,29 @@ import (
 )
 
 // ListCronJobs list cron jobs in namespace that match provided filters. This will fail the test if there is an error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListCronJobs(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) []batchv1.CronJob {
 	cronJobs, err := ListCronJobsE(t, options, filters)
 	require.NoError(t, err)
+
 	return cronJobs
 }
 
 // ListCronJobsE list cron jobs in namespace that match provided filters. This will return list or error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListCronJobsE(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) ([]batchv1.CronJob, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {
 		return nil, err
 	}
+
 	resp, err := clientset.BatchV1().CronJobs(options.Namespace).List(context.Background(), filters)
 	if err != nil {
 		return nil, err
 	}
+
 	return resp.Items, nil
 }
 
@@ -37,6 +44,7 @@ func ListCronJobsE(t testing.TestingT, options *KubectlOptions, filters metav1.L
 func GetCronJob(t testing.TestingT, options *KubectlOptions, cronJobName string) *batchv1.CronJob {
 	job, err := GetCronJobE(t, options, cronJobName)
 	require.NoError(t, err)
+
 	return job
 }
 
@@ -46,6 +54,7 @@ func GetCronJobE(t testing.TestingT, options *KubectlOptions, cronJobName string
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.BatchV1().CronJobs(options.Namespace).Get(context.Background(), cronJobName, metav1.GetOptions{})
 }
 
@@ -59,6 +68,7 @@ func WaitUntilCronJobSucceed(t testing.TestingT, options *KubectlOptions, cronJo
 // amount of times, sleeping for the provided duration between each try.
 func WaitUntilCronJobSucceedE(t testing.TestingT, options *KubectlOptions, cronJobName string, retries int, sleepBetweenRetries time.Duration) error {
 	statusMsg := fmt.Sprintf("Wait for CronJob %s to successfully schedule container", cronJobName)
+
 	message, err := retry.DoWithRetryE(
 		t,
 		statusMsg,
@@ -69,9 +79,11 @@ func WaitUntilCronJobSucceedE(t testing.TestingT, options *KubectlOptions, cronJ
 			if err != nil {
 				return "", err
 			}
+
 			if !IsCronJobSucceeded(job) {
 				return "", NewCronJobNotSucceeded(job)
 			}
+
 			return "CronJob scheduled container", nil
 		},
 	)
@@ -79,7 +91,9 @@ func WaitUntilCronJobSucceedE(t testing.TestingT, options *KubectlOptions, cronJ
 		options.Logger.Logf(t, "Timed out waiting for CronJob to schedule job: %s", err)
 		return err
 	}
+
 	options.Logger.Logf(t, "%s", message)
+
 	return nil
 }
 
