@@ -16,24 +16,30 @@ import (
 
 // ListIngresses will look for Ingress resources in the given namespace that match the given filters and return them.
 // This will fail the test if there is an error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListIngresses(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) []networkingv1.Ingress {
 	ingresses, err := ListIngressesE(t, options, filters)
 	require.NoError(t, err)
+
 	return ingresses
 }
 
 // ListIngressesE will look for Ingress resources in the given namespace that match the given filters and return them.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListIngressesE(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) ([]networkingv1.Ingress, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {
 		return nil, err
 	}
+
 	resp, err := clientset.NetworkingV1().Ingresses(options.Namespace).List(context.Background(), filters)
 	if err != nil {
 		return nil, err
 	}
-	return resp.Items, nil
 
+	return resp.Items, nil
 }
 
 // GetIngress returns a Kubernetes Ingress resource in the provided namespace with the given name. This will fail the
@@ -41,6 +47,7 @@ func ListIngressesE(t testing.TestingT, options *KubectlOptions, filters metav1.
 func GetIngress(t testing.TestingT, options *KubectlOptions, ingressName string) *networkingv1.Ingress {
 	ingress, err := GetIngressE(t, options, ingressName)
 	require.NoError(t, err)
+
 	return ingress
 }
 
@@ -50,6 +57,7 @@ func GetIngressE(t testing.TestingT, options *KubectlOptions, ingressName string
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.NetworkingV1().Ingresses(options.Namespace).Get(context.Background(), ingressName, metav1.GetOptions{})
 }
 
@@ -73,9 +81,11 @@ func WaitUntilIngressAvailable(t testing.TestingT, options *KubectlOptions, ingr
 			if err != nil {
 				return "", err
 			}
+
 			if !IsIngressAvailable(ingress) {
 				return "", IngressNotAvailable{ingress: ingress}
 			}
+
 			return "Ingress is now available", nil
 		},
 	)
@@ -84,25 +94,31 @@ func WaitUntilIngressAvailable(t testing.TestingT, options *KubectlOptions, ingr
 
 // ListIngressesV1Beta1 will look for Ingress resources in the given namespace that match the given filters and return
 // them, using networking.k8s.io/v1beta1 API. This will fail the test if there is an error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListIngressesV1Beta1(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) []networkingv1beta1.Ingress {
 	ingresses, err := ListIngressesV1Beta1E(t, options, filters)
 	require.NoError(t, err)
+
 	return ingresses
 }
 
 // ListIngressesV1Beta1E will look for Ingress resources in the given namespace that match the given filters and return
 // them, using networking.k8s.io/v1beta1 API.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListIngressesV1Beta1E(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) ([]networkingv1beta1.Ingress, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {
 		return nil, err
 	}
+
 	resp, err := clientset.NetworkingV1beta1().Ingresses(options.Namespace).List(context.Background(), filters)
 	if err != nil {
 		return nil, err
 	}
-	return resp.Items, nil
 
+	return resp.Items, nil
 }
 
 // GetIngressV1Beta1 returns a Kubernetes Ingress resource in the provided namespace with the given name, using
@@ -110,6 +126,7 @@ func ListIngressesV1Beta1E(t testing.TestingT, options *KubectlOptions, filters 
 func GetIngressV1Beta1(t testing.TestingT, options *KubectlOptions, ingressName string) *networkingv1beta1.Ingress {
 	ingress, err := GetIngressV1Beta1E(t, options, ingressName)
 	require.NoError(t, err)
+
 	return ingress
 }
 
@@ -120,6 +137,7 @@ func GetIngressV1Beta1E(t testing.TestingT, options *KubectlOptions, ingressName
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.NetworkingV1beta1().Ingresses(options.Namespace).Get(context.Background(), ingressName, metav1.GetOptions{})
 }
 
@@ -145,9 +163,11 @@ func WaitUntilIngressAvailableV1Beta1(t testing.TestingT, options *KubectlOption
 			if err != nil {
 				return "", err
 			}
+
 			if !IsIngressAvailableV1Beta1(ingress) {
 				return "", IngressNotAvailableV1Beta1{ingress: ingress}
 			}
+
 			return "Ingress is now available", nil
 		},
 	)

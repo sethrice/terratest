@@ -19,22 +19,29 @@ import (
 
 // ListServices will look for services in the given namespace that match the given filters and return them. This will
 // fail the test if there is an error.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListServices(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) []corev1.Service {
 	service, err := ListServicesE(t, options, filters)
 	require.NoError(t, err)
+
 	return service
 }
 
 // ListServicesE will look for services in the given namespace that match the given filters and return them.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func ListServicesE(t testing.TestingT, options *KubectlOptions, filters metav1.ListOptions) ([]corev1.Service, error) {
 	clientset, err := GetKubernetesClientFromOptionsE(t, options)
 	if err != nil {
 		return nil, err
 	}
+
 	resp, err := clientset.CoreV1().Services(options.Namespace).List(context.Background(), filters)
 	if err != nil {
 		return nil, err
 	}
+
 	return resp.Items, nil
 }
 
@@ -43,6 +50,7 @@ func ListServicesE(t testing.TestingT, options *KubectlOptions, filters metav1.L
 func GetService(t testing.TestingT, options *KubectlOptions, serviceName string) *corev1.Service {
 	service, err := GetServiceE(t, options, serviceName)
 	require.NoError(t, err)
+
 	return service
 }
 
@@ -52,6 +60,7 @@ func GetServiceE(t testing.TestingT, options *KubectlOptions, serviceName string
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.CoreV1().Services(options.Namespace).Get(context.Background(), serviceName, metav1.GetOptions{})
 }
 
@@ -79,6 +88,7 @@ func WaitUntilServiceAvailable(t testing.TestingT, options *KubectlOptions, serv
 			if !isMinikube && !IsServiceAvailable(service) {
 				return "", NewServiceNotAvailableError(service)
 			}
+
 			return "Service is now available", nil
 		},
 	)
@@ -94,6 +104,8 @@ func IsServiceAvailable(service *corev1.Service) bool {
 		ingress := service.Status.LoadBalancer.Ingress
 		// The load balancer is ready if it has at least one ingress point
 		return len(ingress) > 0
+	case corev1.ServiceTypeClusterIP, corev1.ServiceTypeNodePort, corev1.ServiceTypeExternalName:
+		return true
 	default:
 		return true
 	}
@@ -104,6 +116,7 @@ func IsServiceAvailable(service *corev1.Service) bool {
 func GetServiceEndpoint(t testing.TestingT, options *KubectlOptions, service *corev1.Service, servicePort int) string {
 	endpoint, err := GetServiceEndpointE(t, options, service, servicePort)
 	require.NoError(t, err)
+
 	return endpoint
 }
 
@@ -121,12 +134,15 @@ func GetServiceEndpointE(t testing.TestingT, options *KubectlOptions, service *c
 		return fmt.Sprintf("%s:%d", service.Spec.ClusterIP, servicePort), nil
 	case corev1.ServiceTypeNodePort:
 		return findEndpointForNodePortService(t, options, service, int32(servicePort))
+	case corev1.ServiceTypeExternalName:
+		return "", NewUnknownServiceTypeError(service)
 	case corev1.ServiceTypeLoadBalancer:
 		// For minikube, LoadBalancer service is exactly the same as NodePort service
 		isMinikube, err := IsMinikubeE(t, options)
 		if err != nil {
 			return "", err
 		}
+
 		if isMinikube {
 			return findEndpointForNodePortService(t, options, service, int32(servicePort))
 		}
@@ -135,6 +151,7 @@ func GetServiceEndpointE(t testing.TestingT, options *KubectlOptions, service *c
 		if len(ingress) == 0 {
 			return "", NewServiceNotAvailableError(service)
 		}
+
 		if ingress[0].Hostname == "" {
 			return fmt.Sprintf("%s:%d", ingress[0].IP, servicePort), nil
 		}
@@ -153,28 +170,32 @@ func findEndpointForNodePortService(
 	service *corev1.Service,
 	servicePort int32,
 ) (string, error) {
-	nodePort, err := FindNodePortE(service, int32(servicePort))
+	nodePort, err := FindNodePortE(service, servicePort)
 	if err != nil {
 		return "", err
 	}
+
 	node, err := pickRandomNodeE(t, options)
 	if err != nil {
 		return "", err
 	}
+
 	nodeHostname, err := FindNodeHostnameE(t, node)
 	if err != nil {
 		return "", err
 	}
+
 	return fmt.Sprintf("%s:%d", nodeHostname, nodePort), nil
 }
 
-// Given the desired servicePort, return the allocated nodeport
+// FindNodePortE returns the allocated NodePort for the given servicePort from the service definition.
 func FindNodePortE(service *corev1.Service, servicePort int32) (int32, error) {
 	for _, port := range service.Spec.Ports {
 		if port.Port == servicePort {
 			return port.NodePort, nil
 		}
 	}
+
 	return -1, NewUnknownServicePortError(service, servicePort)
 }
 
@@ -184,36 +205,46 @@ func pickRandomNodeE(t testing.TestingT, options *KubectlOptions) (corev1.Node, 
 	if err != nil {
 		return corev1.Node{}, err
 	}
+
 	if len(nodes) == 0 {
 		return corev1.Node{}, NewNoNodesInKubernetesError()
 	}
+
 	index := random.Random(0, len(nodes)-1)
+
 	return nodes[index], nil
 }
 
-// Given a node, return the ip address, preferring the external IP
+// FindNodeHostnameE returns the hostname or IP address of the given node, preferring the external IP when available.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func FindNodeHostnameE(t testing.TestingT, node corev1.Node) (string, error) {
 	nodeIDUri, err := url.Parse(node.Spec.ProviderID)
 	if err != nil {
 		return "", err
 	}
+
 	switch nodeIDUri.Scheme {
 	case "aws":
-		return findAwsNodeHostnameE(t, node, nodeIDUri)
+		return findAwsNodeHostnameE(t, &node, nodeIDUri)
 	default:
-		return findDefaultNodeHostnameE(node)
+		return findDefaultNodeHostnameE(&node)
 	}
 }
 
 // findAwsNodeHostname will return the public ip of the node, assuming the node is an AWS EC2 instance.
 // If the instance does not have a public IP, will return the internal hostname as recorded on the Kubernetes node
 // object.
-func findAwsNodeHostnameE(t testing.TestingT, node corev1.Node, awsIDUri *url.URL) (string, error) {
+// expectedAWSIDPathParts is the number of path segments in an AWS provider ID (empty, availability zone, instance ID).
+const expectedAWSIDPathParts = 3
+
+func findAwsNodeHostnameE(t testing.TestingT, node *corev1.Node, awsIDUri *url.URL) (string, error) {
 	// Path is /AVAILABILITY_ZONE/INSTANCE_ID
 	parts := strings.Split(awsIDUri.Path, "/")
-	if len(parts) != 3 {
-		return "", NewMalformedNodeIDError(&node)
+	if len(parts) != expectedAWSIDPathParts {
+		return "", NewMalformedNodeIDError(node)
 	}
+
 	instanceID := parts[2]
 	availabilityZone := parts[1]
 	// Availability Zone name is known to be region code + 1 letter
@@ -230,15 +261,17 @@ func findAwsNodeHostnameE(t testing.TestingT, node corev1.Node, awsIDUri *url.UR
 		// return default hostname
 		return findDefaultNodeHostnameE(node)
 	}
+
 	return publicIP, nil
 }
 
 // findDefaultNodeHostname returns the hostname recorded on the Kubernetes node object.
-func findDefaultNodeHostnameE(node corev1.Node) (string, error) {
+func findDefaultNodeHostnameE(node *corev1.Node) (string, error) {
 	for _, address := range node.Status.Addresses {
 		if address.Type == corev1.NodeHostName {
 			return address.Address, nil
 		}
 	}
-	return "", NewNodeHasNoHostnameError(&node)
+
+	return "", NewNodeHasNoHostnameError(node)
 }

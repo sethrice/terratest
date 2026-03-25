@@ -14,6 +14,7 @@ import (
 func GetRole(t testing.TestingT, options *KubectlOptions, roleName string) *rbacv1.Role {
 	role, err := GetRoleE(t, options, roleName)
 	require.NoError(t, err)
+
 	return role
 }
 
@@ -24,5 +25,6 @@ func GetRoleE(t testing.TestingT, options *KubectlOptions, roleName string) (*rb
 	if err != nil {
 		return nil, err
 	}
+
 	return clientset.RbacV1().Roles(options.Namespace).Get(context.Background(), roleName, metav1.GetOptions{})
 }

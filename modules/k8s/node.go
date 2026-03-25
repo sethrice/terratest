@@ -2,7 +2,6 @@ package k8s
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -18,6 +17,7 @@ import (
 func GetNodes(t testing.TestingT, options *KubectlOptions) []corev1.Node {
 	nodes, err := GetNodesE(t, options)
 	require.NoError(t, err)
+
 	return nodes
 }
 
@@ -28,6 +28,8 @@ func GetNodesE(t testing.TestingT, options *KubectlOptions) ([]corev1.Node, erro
 
 // GetNodesByFilterE queries Kubernetes for information about the worker nodes registered to the cluster, filtering the
 // list of nodes using the provided ListOptions.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func GetNodesByFilterE(t testing.TestingT, options *KubectlOptions, filter metav1.ListOptions) ([]corev1.Node, error) {
 	options.Logger.Logf(t, "Getting list of nodes from Kubernetes")
 
@@ -40,6 +42,7 @@ func GetNodesByFilterE(t testing.TestingT, options *KubectlOptions, filter metav
 	if err != nil {
 		return nil, err
 	}
+
 	return nodes.Items, err
 }
 
@@ -48,6 +51,7 @@ func GetNodesByFilterE(t testing.TestingT, options *KubectlOptions, filter metav
 func GetReadyNodes(t testing.TestingT, options *KubectlOptions) []corev1.Node {
 	nodes, err := GetReadyNodesE(t, options)
 	require.NoError(t, err)
+
 	return nodes
 }
 
@@ -58,23 +62,30 @@ func GetReadyNodesE(t testing.TestingT, options *KubectlOptions) ([]corev1.Node,
 	if err != nil {
 		return nil, err
 	}
+
 	options.Logger.Logf(t, "Filtering list of nodes from Kubernetes for Ready nodes")
+
 	nodesFiltered := []corev1.Node{}
-	for _, node := range nodes {
-		if IsNodeReady(node) {
-			nodesFiltered = append(nodesFiltered, node)
+
+	for i := range nodes {
+		if IsNodeReady(nodes[i]) {
+			nodesFiltered = append(nodesFiltered, nodes[i])
 		}
 	}
+
 	return nodesFiltered, nil
 }
 
 // IsNodeReady takes a Kubernetes Node information object and checks if the Node is in the ready state.
+//
+//nolint:gocritic // hugeParam: cannot change public function signature
 func IsNodeReady(node corev1.Node) bool {
 	for _, condition := range node.Status.Conditions {
 		if condition.Type == corev1.NodeReady {
 			return condition.Status == corev1.ConditionTrue
 		}
 	}
+
 	return false
 }
 
@@ -98,10 +109,12 @@ func WaitUntilAllNodesReadyE(t testing.TestingT, options *KubectlOptions, retrie
 			if err != nil {
 				return "", err
 			}
+
 			return "All nodes ready", nil
 		},
 	)
 	options.Logger.Logf(t, "%s", message)
+
 	return err
 }
 
@@ -118,13 +131,16 @@ func AreAllNodesReadyE(t testing.TestingT, options *KubectlOptions) (bool, error
 	if err != nil {
 		return false, err
 	}
+
 	if len(nodes) == 0 {
-		return false, errors.New("No nodes available")
+		return false, ErrNoNodesAvailable
 	}
-	for _, node := range nodes {
-		if !IsNodeReady(node) {
-			return false, errors.New("Not all nodes ready")
+
+	for i := range nodes {
+		if !IsNodeReady(nodes[i]) {
+			return false, ErrNotAllNodesReady
 		}
 	}
+
 	return true, nil
 }

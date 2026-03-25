@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"context"
 	"net/url"
 	"os"
 
@@ -10,41 +11,68 @@ import (
 	"github.com/gruntwork-io/terratest/modules/testing"
 )
 
-// RunKubectl will call kubectl using the provided options and args, failing the test on error.
-func RunKubectl(t testing.TestingT, options *KubectlOptions, args ...string) {
-	require.NoError(t, RunKubectlE(t, options, args...))
+// RunKubectlContext calls kubectl using the provided context, options, and args, failing the test on error.
+func RunKubectlContext(t testing.TestingT, ctx context.Context, options *KubectlOptions, args ...string) {
+	require.NoError(t, RunKubectlContextE(t, ctx, options, args...))
 }
 
-// RunKubectlE will call kubectl using the provided options and args.
-func RunKubectlE(t testing.TestingT, options *KubectlOptions, args ...string) error {
-	_, err := RunKubectlAndGetOutputE(t, options, args...)
+// RunKubectl calls kubectl using the provided options and args, failing the test on error.
+//
+// Deprecated: Use RunKubectlContext instead.
+func RunKubectl(t testing.TestingT, options *KubectlOptions, args ...string) {
+	RunKubectlContext(t, context.Background(), options, args...)
+}
+
+// RunKubectlContextE calls kubectl using the provided context, options, and args.
+func RunKubectlContextE(t testing.TestingT, ctx context.Context, options *KubectlOptions, args ...string) error {
+	_, err := RunKubectlAndGetOutputContextE(t, ctx, options, args...)
 	return err
 }
 
-// RunKubectlAndGetOutputE will call kubectl using the provided options and args, returning the output of stdout and
-// stderr.
-func RunKubectlAndGetOutputE(t testing.TestingT, options *KubectlOptions, args ...string) (string, error) {
+// RunKubectlE calls kubectl using the provided options and args.
+//
+// Deprecated: Use RunKubectlContextE instead.
+func RunKubectlE(t testing.TestingT, options *KubectlOptions, args ...string) error {
+	return RunKubectlContextE(t, context.Background(), options, args...)
+}
+
+// RunKubectlAndGetOutputContextE calls kubectl using the provided context, options, and args, returning the
+// combined output of stdout and stderr.
+func RunKubectlAndGetOutputContextE(t testing.TestingT, ctx context.Context, options *KubectlOptions, args ...string) (string, error) {
 	cmdArgs := []string{}
 	if options.ContextName != "" {
 		cmdArgs = append(cmdArgs, "--context", options.ContextName)
 	}
+
 	if options.ConfigPath != "" {
 		cmdArgs = append(cmdArgs, "--kubeconfig", options.ConfigPath)
 	}
+
 	if options.Namespace != "" {
 		cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
 	}
+
 	if options.RequestTimeout > 0 {
 		cmdArgs = append(cmdArgs, "--request-timeout", options.RequestTimeout.String())
 	}
+
 	cmdArgs = append(cmdArgs, args...)
-	command := shell.Command{
+	command := &shell.Command{
 		Command: "kubectl",
 		Args:    cmdArgs,
 		Env:     options.Env,
 		Logger:  options.Logger,
 	}
-	return shell.RunCommandAndGetOutputE(t, command)
+
+	return shell.RunCommandContextAndGetOutputE(t, ctx, command)
+}
+
+// RunKubectlAndGetOutputE calls kubectl using the provided options and args, returning the combined output of
+// stdout and stderr.
+//
+// Deprecated: Use RunKubectlAndGetOutputContextE instead.
+func RunKubectlAndGetOutputE(t testing.TestingT, options *KubectlOptions, args ...string) (string, error) {
+	return RunKubectlAndGetOutputContextE(t, context.Background(), options, args...)
 }
 
 // KubectlDelete will take in a file path and delete it from the cluster targeted by KubectlOptions. If there are any
@@ -82,7 +110,9 @@ func KubectlDeleteFromStringE(t testing.TestingT, options *KubectlOptions, confi
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmpfile)
+
+	defer func() { _ = os.Remove(tmpfile) }()
+
 	return KubectlDeleteE(t, options, tmpfile)
 }
 
@@ -121,7 +151,9 @@ func KubectlApplyFromStringE(t testing.TestingT, options *KubectlOptions, config
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmpfile)
+
+	defer func() { _ = os.Remove(tmpfile) }()
+
 	return KubectlApplyE(t, options, tmpfile)
 }
 
@@ -130,6 +162,7 @@ func KubectlApplyFromStringE(t testing.TestingT, options *KubectlOptions, config
 func StoreConfigToTempFile(t testing.TestingT, configData string) string {
 	out, err := StoreConfigToTempFileE(t, configData)
 	require.NoError(t, err)
+
 	return out
 }
 
@@ -137,6 +170,7 @@ func StoreConfigToTempFile(t testing.TestingT, configData string) string {
 // filename, or error.
 func StoreConfigToTempFileE(t testing.TestingT, configData string) (string, error) {
 	escapedTestName := url.PathEscape(t.Name())
+
 	tmpfile, err := os.CreateTemp("", escapedTestName)
 	if err != nil {
 		return "", err
@@ -144,5 +178,6 @@ func StoreConfigToTempFileE(t testing.TestingT, configData string) (string, erro
 	defer tmpfile.Close()
 
 	_, err = tmpfile.WriteString(configData)
+
 	return tmpfile.Name(), err
 }
